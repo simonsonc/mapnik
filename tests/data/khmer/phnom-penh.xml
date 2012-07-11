@@ -1,0 +1,17 @@
+<!-- see: http://trac.mapnik.org/changeset/574 --><Map background-color="steelblue" srs="+proj=longlat +ellps=airy +datum=OSGB36 +no_defs" minimum-version="0.7.2">
+
+  <Style name="test">
+    <Rule>
+      <TextSymbolizer face-name="Khmer OS Regular" size="16" placement="point">[name]</TextSymbolizer>
+    </Rule>  
+  </Style>
+
+  <Layer name="lay" srs="+proj=longlat +ellps=airy +datum=OSGB36 +no_defs ">
+    <StyleName>test</StyleName>
+    <Datasource>
+      <Parameter name="type">shape</Parameter>
+      <Parameter name="file">phnom-penh.shp</Parameter>
+    </Datasource>
+  </Layer>
+  
+</Map>
