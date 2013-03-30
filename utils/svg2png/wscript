@@ -1,0 +1,5 @@
+def build(bld):
+    bld.program(
+        target="svg2png",
+        source="svg2png.cpp",
+        use="mapnik BOOST_PROGRAM_OPTIONS")

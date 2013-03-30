@@ -1,0 +1,5 @@
+def build(bld):
+    bld.program(
+        target="rundemo",
+        source="rundemo.cpp",
+        use="mapnik")

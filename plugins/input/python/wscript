@@ -1,0 +1,7 @@
+sources = """
+python_datasource.cpp
+python_featureset.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("python", features="pyext", source=sources, use="mapnik")

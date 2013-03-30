@@ -1,0 +1,6 @@
+def build(bld):
+    bld.program(
+        target="ogrindex",
+        source="ogrindex.cpp",
+        includes="#plugins/input/ogr",
+        use="mapnik GDAL BOOST_PROGRAM_OPTIONS")

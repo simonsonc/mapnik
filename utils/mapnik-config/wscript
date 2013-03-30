@@ -1,0 +1,49 @@
+# vim: set filetype=python :
+from waflib.Task import Task
+from waflib import Utils
+
+config_variables = '''#!/bin/sh
+
+## variables
+
+CONFIG_PREFIX=%(prefix)s
+CONFIG_MAPNIK_LIBNAME=%(mapnik_libname)s
+CONFIG_MAPNIK_INCLUDE=${CONFIG_PREFIX}/include
+CONFIG_MAPNIK_LIB=${CONFIG_PREFIX}/%(libdir_schema)s
+CONFIG_MAPNIK_VERSION='%(version)s'
+CONFIG_MAPNIK_LDFLAGS='%(ldflags)s'
+CONFIG_DEP_LIBS='%(dep_libs)s'
+CONFIG_OTHER_INCLUDES='%(other_includes)s'
+CONFIG_FONTS='%(fonts)s'
+CONFIG_INPUT_PLUGINS='%(input_plugins)s'
+CONFIG_GIT_REVISION='%(git_revision)s'
+
+'''
+
+class MapnikConfigTask(Task):
+    def run(self):
+        template = self.inputs[0].read()
+        self.outputs[0].write(config_variables % self.configuration + template)
+
+def build(bld):
+    configuration = {
+        "prefix": bld.env.PREFIX,
+        "mapnik_libname": 'mapnik',
+        "libdir_schema": '', #config_env['LIBDIR_SCHEMA'],
+        "ldflags": '', #ldflags,
+        "dep_libs": '', #dep_libs,
+        "other_includes": '', #other_includes,
+        "fonts": '', #config_env['MAPNIK_FONTS'],
+        "input_plugins": '', #config_env['MAPNIK_INPUT_PLUGINS'],
+        "git_revision": '', #git_revision,
+        "version": bld.env.MAPNIK_VERSION_STRING,
+    }
+
+    output = bld.path.find_or_declare('mapnik-config')
+    task = MapnikConfigTask(env=bld.env)
+    task.set_inputs(bld.path.find_resource('mapnik-config.template.sh'))
+    task.set_outputs(output)
+    task.configuration = configuration
+
+    bld.add_to_group(task)
+    bld.install_files('${PREFIX}/bin', output, chmod=Utils.O755)

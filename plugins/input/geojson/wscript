@@ -1,0 +1,7 @@
+sources = """
+geojson_datasource.cpp
+geojson_featureset.cpp      
+""".split()
+
+def build(bld):
+    bld.plugin("geojson", source=sources, use="mapnik")

@@ -1,0 +1,7 @@
+# vim: set filetype=python :
+
+def build(bld):
+    # install headers
+    include_dir = bld.path
+    bld.install_files('${PREFIX}/include', include_dir.ant_glob("**/*.hpp"),
+        cwd=include_dir, relative_trick=True)

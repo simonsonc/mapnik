@@ -1,0 +1,11 @@
+sources = """
+dbfile.cpp
+shape_datasource.cpp
+shape_featureset.cpp
+shape_index_featureset.cpp
+shape_io.cpp
+shape_utils.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("shape", source=sources, use="mapnik")

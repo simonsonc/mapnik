@@ -1,0 +1,7 @@
+sources = """
+gdal_datasource.cpp
+gdal_featureset.cpp      
+""".split()
+
+def build(bld):
+    bld.plugin("gdal", source=sources, use="mapnik GDAL")

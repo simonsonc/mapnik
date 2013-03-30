@@ -1,0 +1,7 @@
+sources = """
+hello_datasource.cpp
+hello_featureset.cpp
+""".split()
+
+def build(bld):
+    bld.plugin('hello', source=sources, use="mapnik")

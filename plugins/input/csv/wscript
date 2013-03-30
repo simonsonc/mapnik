@@ -1,0 +1,6 @@
+sources = """
+csv_datasource.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("csv", source=sources, use="mapnik")

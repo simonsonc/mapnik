@@ -1,0 +1,4 @@
+from waflib import Utils
+
+def build(bld):
+    bld.install_files('${PREFIX}/bin', 'mapnik-speed-check', chmod=Utils.O755)

@@ -1,0 +1,7 @@
+def build(bld):
+    for cpp_test in bld.path.ant_glob('*_test.cpp'):
+        target = str(cpp_test).replace('.cpp','-bin')
+        bld.program(
+            target=target,
+            source=str(cpp_test),
+            use="mapnik")

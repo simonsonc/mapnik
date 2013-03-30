@@ -1,0 +1,6 @@
+def build(bld):
+    bld.program(
+        target="shapeindex",
+        source="shapeindex.cpp",
+        includes="#/plugins/input/shape",
+        use="mapnik BOOST_PROGRAM_OPTIONS")
