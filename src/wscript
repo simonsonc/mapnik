@@ -1,0 +1,187 @@
+# vim: set filetype=python :
+
+sources="""
+    fs.cpp
+    debug_symbolizer.cpp
+    request.cpp
+    well_known_srs.cpp
+    params.cpp
+    image_filter_types.cpp
+    miniz_png.cpp
+    color.cpp
+    css_color_grammar.cpp
+    conversions.cpp
+    image_compositing.cpp
+    image_filter_grammar.cpp
+    image_scaling.cpp
+    box2d.cpp
+    building_symbolizer.cpp
+    datasource_cache.cpp
+    datasource_cache_static.cpp
+    debug.cpp
+    deepcopy.cpp
+    expression_node.cpp
+    expression_grammar.cpp
+    expression_string.cpp
+    expression.cpp
+    transform_expression_grammar.cpp
+    transform_expression.cpp
+    feature_kv_iterator.cpp
+    feature_style_processor.cpp
+    feature_type_style.cpp
+    font_engine_freetype.cpp
+    font_set.cpp
+    gamma_method.cpp
+    gradient.cpp
+    graphics.cpp
+    image_reader.cpp
+    image_util.cpp
+    layer.cpp
+    line_symbolizer.cpp
+    line_pattern_symbolizer.cpp
+    map.cpp
+    load_map.cpp
+    memory.cpp
+    parse_path.cpp
+    parse_transform.cpp
+    palette.cpp
+    path_expression_grammar.cpp
+    text/placement_finder.cpp
+    plugin.cpp
+    point_symbolizer.cpp
+    polygon_pattern_symbolizer.cpp
+    polygon_symbolizer.cpp
+    rule.cpp
+    save_map.cpp
+    shield_symbolizer.cpp
+    text_symbolizer.cpp
+    wkb.cpp
+    projection.cpp
+    proj_transform.cpp
+    distance.cpp
+    scale_denominator.cpp
+    simplify.cpp
+    memory_datasource.cpp
+    stroke.cpp
+    symbolizer.cpp
+    text/symbolizer_helpers.cpp
+    unicode.cpp
+    markers_symbolizer.cpp
+    raster_colorizer.cpp
+    raster_symbolizer.cpp
+    wkt/wkt_factory.cpp
+    wkt/wkt_generator.cpp
+    mapped_memory_cache.cpp
+    marker_cache.cpp
+    svg/svg_parser.cpp
+    svg/svg_path_parser.cpp
+    svg/svg_points_parser.cpp
+    svg/svg_transform_parser.cpp
+    warp.cpp
+    json/geometry_grammar.cpp
+    json/geometry_parser.cpp
+    json/feature_grammar.cpp
+    json/feature_parser.cpp
+    json/feature_collection_parser.cpp
+    json/geojson_generator.cpp
+    text/processed_text.cpp
+    text/formatting/base.cpp
+    text/formatting/expression.cpp
+    text/formatting/list.cpp
+    text/formatting/text.cpp
+    text/formatting/format.cpp
+    text/formatting/registry.cpp
+    text/placements/registry.cpp
+    text/placements/base.cpp
+    text/placements/dummy.cpp
+    text/placements/list.cpp
+    text/placements/simple.cpp
+    text/text_properties.cpp
+    xml_tree.cpp
+    config_error.cpp
+    color_factory.cpp
+""".split()
+
+sources += """
+    agg/agg_renderer.cpp
+    agg/process_building_symbolizer.cpp
+    agg/process_line_symbolizer.cpp
+    agg/process_line_pattern_symbolizer.cpp
+    agg/process_text_symbolizer.cpp
+    agg/process_point_symbolizer.cpp
+    agg/process_polygon_symbolizer.cpp
+    agg/process_polygon_pattern_symbolizer.cpp
+    agg/process_raster_symbolizer.cpp
+    agg/process_shield_symbolizer.cpp
+    agg/process_markers_symbolizer.cpp
+    agg/process_debug_symbolizer.cpp
+""".split()
+
+sources+="""
+    grid/grid.cpp
+    grid/grid_renderer.cpp
+    grid/process_building_symbolizer.cpp
+    grid/process_line_pattern_symbolizer.cpp
+    grid/process_line_symbolizer.cpp
+    grid/process_markers_symbolizer.cpp
+    grid/process_point_symbolizer.cpp
+    grid/process_polygon_pattern_symbolizer.cpp
+    grid/process_polygon_symbolizer.cpp
+    grid/process_raster_symbolizer.cpp
+    grid/process_shield_symbolizer.cpp
+    grid/process_text_symbolizer.cpp
+""".split()
+
+sources += """
+    libxml2_loader.cpp
+""".split()
+
+sources += """
+    feature_style_processor.cpp
+""".split()
+
+sources += """
+jpeg_reader.cpp
+""".split()
+
+sources += """
+tiff_reader.cpp
+""".split()
+
+sources += """
+png_reader.cpp
+""".split()
+
+'''
+sources += """
+svg/svg_renderer.cpp
+svg/svg_generator.cpp
+svg/svg_output_attributes.cpp
+svg/process_symbolizers.cpp
+svg/process_building_symbolizer.cpp
+svg/process_line_pattern_symbolizer.cpp
+svg/process_line_symbolizer.cpp
+svg/process_markers_symbolizer.cpp
+svg/process_point_symbolizer.cpp
+svg/process_polygon_pattern_symbolizer.cpp
+svg/process_polygon_symbolizer.cpp
+svg/process_raster_symbolizer.cpp
+svg/process_shield_symbolizer.cpp
+svg/process_text_symbolizer.cpp
+""".split()
+'''
+
+sources += """
+cairo_renderer.cpp
+cairo_context.cpp
+""".split()
+
+def build(bld):
+    bld.shlib(
+        name="mapnik",
+        target="mapnik",
+        source=sources,
+        includes="../deps ../include",
+        defines="GRID_RENDERER",
+        export_includes="../include ..",
+        use="AGG FREETYPE LTDL PNG TIFF JPEG LIBXML2 PROJ CAIROMM ICU BOOST_REGEX BOOST_FILESYSTEM BOOST_THREAD")

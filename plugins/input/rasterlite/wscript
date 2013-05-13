@@ -1,0 +1,7 @@
+sources = """
+rasterlite_datasource.cpp
+rasterlite_featureset.cpp      
+""".split()
+
+def build(bld):
+    bld.plugin("rasterlite", source=sources, use="mapnik RASTERLITE")

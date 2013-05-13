@@ -1,0 +1,7 @@
+sources = """
+postgis_datasource.cpp
+postgis_featureset.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("postgis", source=sources, use="mapnik POSTGRES")

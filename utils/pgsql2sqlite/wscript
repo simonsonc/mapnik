@@ -1,0 +1,6 @@
+def build(bld):
+    bld.program(
+        target="pgsql2sqlite",
+        source="main.cpp sqlite.cpp",
+        includes="#plugins/input/postgis",
+        use="mapnik SQLITE POSTGRES BOOST_PROGRAM_OPTIONS")

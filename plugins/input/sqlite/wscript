@@ -1,0 +1,7 @@
+sources = """
+sqlite_datasource.cpp
+sqlite_featureset.cpp      
+""".split()
+
+def build(bld):
+    bld.plugin("sqlite", source=sources, use="mapnik SQLITE")

@@ -1,0 +1,18 @@
+import glob
+
+excluded_tests = """
+csv_parse_test.cpp
+""".split()
+
+def build(bld):
+    for cpp_test in bld.path.ant_glob('*_test.cpp'):
+        if str(cpp_test) in excluded_tests:
+            continue
+
+        target = str(cpp_test).replace('.cpp','-bin')
+        bld.program(
+            features="test",
+            target=target,
+            source=str(cpp_test),
+            use="mapnik",
+            ut_cwd=bld.path.parent.parent.srcpath())

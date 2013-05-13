@@ -1,0 +1,7 @@
+def build(bld):
+    bld.stlib(name="CLIPPER",
+        target="clipper",
+        source=bld.path.ant_glob("src/*.cpp"),
+	    cxxflags='-fPIC',
+        includes="include ../../include",
+        export_includes="include")

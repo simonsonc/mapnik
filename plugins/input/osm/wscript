@@ -1,0 +1,11 @@
+sources = """
+osmparser.cpp
+osm.cpp
+osm_datasource.cpp
+osm_featureset.cpp 
+dataset_deliverer.cpp
+basiccurl.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("osm", source=sources, use="mapnik LIBXML2 LIBCURL")

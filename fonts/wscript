@@ -1,0 +1,4 @@
+def build(bld):
+    bld.install_files(
+        '${MAPNIK_LIBDIR}/fonts',
+        bld.path.ant_glob("**/*.ttf"))

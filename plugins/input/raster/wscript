@@ -1,0 +1,8 @@
+sources = """
+raster_datasource.cpp
+raster_featureset.cpp
+raster_info.cpp      
+""".split()
+
+def build(bld):
+    bld.plugin("raster", source=sources, use="mapnik")

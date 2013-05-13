@@ -1,0 +1,46 @@
+sources = """
+main.cpp
+mainwindow.cpp 
+mapwidget.cpp
+layerwidget.cpp
+layerlistmodel.cpp 
+layerdelegate.cpp
+styles_model.cpp
+about_dialog.cpp
+info_dialog.cpp
+layer_info_dialog.cpp
+forms/about.ui
+forms/info.ui
+forms/layer_info.ui
+mapnik_viewer.qrc
+""".split()
+
+headers = """
+mainwindow.hpp
+mapwidget.hpp
+layerwidget.hpp
+layerlistmodel.hpp
+layerdelegate.hpp
+styles_model.hpp 
+about_dialog.hpp
+info_dialog.hpp
+layer_info_dialog.hpp
+""".split()
+
+def options(opt):
+    opt.load('better_qt4', tooldir='waftools')
+
+def configure(cfg):
+    cfg.load('better_qt4', tooldir='waftools')
+    cfg.load('boost', tooldir='waftools')
+
+    cfg.check_boost(lib="timer", uselib_store="BOOST_TIMER")
+
+def build(bld):
+    bld.program(
+        features='qt4',
+        target='mapnik-viewer',
+        source=sources,
+        includes=".",
+        mocfiles=headers,
+        use="QTGUI BOOST_TIMER mapnik")

@@ -1,0 +1,9 @@
+sources = """
+ogr_converter.cpp
+ogr_datasource.cpp
+ogr_featureset.cpp      
+ogr_index_featureset.cpp
+""".split()
+
+def build(bld):
+    bld.plugin("ogr", source=sources, use="mapnik GDAL")
