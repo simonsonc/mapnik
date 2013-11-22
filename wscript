@@ -40,6 +40,8 @@ def configure(conf):
     conf.check_cfg(package="freetype2", args="--cflags --libs", uselib_store="FREETYPE")
     conf.check_cfg(package="libxml-2.0", args="--cflags --libs", uselib_store="LIBXML2")
     conf.check_cfg(package="libcurl", args="--cflags --libs", uselib_store="LIBCURL")
+    conf.check_cfg(package="harfbuzz", args="--cflags --libs", uselib_store="HARFBUZZ")
+    conf.check_cfg(package="harfbuzz-icu", args="--cflags --libs", uselib_store="HARFBUZZ_ICU")
 
     # boost libraries
     '''
@@ -123,7 +125,7 @@ def build(bld):
     bld.recurse('demo/c++')
     bld.recurse('demo/viewer')
 
-    bld.recurse('utils/mapnik-config')
+    bld.recurse('bin')
     #bld.recurse('utils/ogrindex')
     bld.recurse('utils/performance')
     bld.recurse('utils/pgsql2sqlite')

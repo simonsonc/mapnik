@@ -19,7 +19,6 @@ sources="""
     datasource_cache.cpp
     datasource_cache_static.cpp
     debug.cpp
-    deepcopy.cpp
     expression_node.cpp
     expression_grammar.cpp
     expression_string.cpp
@@ -46,7 +45,6 @@ sources="""
     parse_transform.cpp
     palette.cpp
     path_expression_grammar.cpp
-    text/placement_finder.cpp
     plugin.cpp
     point_symbolizer.cpp
     polygon_pattern_symbolizer.cpp
@@ -64,7 +62,6 @@ sources="""
     memory_datasource.cpp
     stroke.cpp
     symbolizer.cpp
-    text/symbolizer_helpers.cpp
     unicode.cpp
     markers_symbolizer.cpp
     raster_colorizer.cpp
@@ -84,7 +81,16 @@ sources="""
     json/feature_parser.cpp
     json/feature_collection_parser.cpp
     json/geojson_generator.cpp
-    text/processed_text.cpp
+    text/vertex_cache.cpp
+    text/layout.cpp
+    text/text_line.cpp
+    text/itemizer.cpp
+    text/scrptrun.cpp
+    text/face.cpp
+    text/placement_finder.cpp
+    text/renderer.cpp
+    text/symbolizer_helpers.cpp
+    text/text_properties.cpp
     text/formatting/base.cpp
     text/formatting/expression.cpp
     text/formatting/list.cpp
@@ -96,7 +102,6 @@ sources="""
     text/placements/dummy.cpp
     text/placements/list.cpp
     text/placements/simple.cpp
-    text/text_properties.cpp
     xml_tree.cpp
     config_error.cpp
     color_factory.cpp
@@ -184,4 +189,4 @@ def build(bld):
         includes="../deps ../include",
         defines="GRID_RENDERER",
         export_includes="../include ..",
-        use="AGG FREETYPE LTDL PNG TIFF JPEG LIBXML2 PROJ CAIROMM ICU BOOST_REGEX BOOST_FILESYSTEM BOOST_THREAD")
+        use="AGG HARFBUZZ HARFBUZZ_ICU FREETYPE LTDL PNG TIFF JPEG LIBXML2 PROJ CAIROMM ICU BOOST_REGEX BOOST_FILESYSTEM BOOST_THREAD")
