@@ -159,7 +159,7 @@ void register_cairo()
 #else
     Pycairo_CAPI = (Pycairo_CAPI_t*) PyCObject_Import(const_cast<char *>("cairo"), const_cast<char *>("CAPI"));
 #endif
-    if (Pycairo_CAPI == NULL) return;
+    if (Pycairo_CAPI == nullptr) return;
 
     boost::python::converter::registry::insert(&extract_surface, boost::python::type_id<PycairoSurface>());
     boost::python::converter::registry::insert(&extract_context, boost::python::type_id<PycairoContext>());
@@ -503,7 +503,7 @@ bool has_pycairo()
 #else
     Pycairo_CAPI = (Pycairo_CAPI_t*) PyCObject_Import(const_cast<char *>("cairo"), const_cast<char *>("CAPI"));
 #endif
-    if (Pycairo_CAPI == NULL){
+    if (Pycairo_CAPI == nullptr){
         /*
           Case where pycairo support has been compiled into
           mapnik but at runtime the cairo python module
@@ -860,6 +860,7 @@ BOOST_PYTHON_MODULE(_mapnik)
     def("has_png", &has_png, "Get png read/write support status");
     def("has_tiff", &has_tiff, "Get tiff read/write support status");
     def("has_webp", &has_webp, "Get webp read/write support status");
+    def("has_svg_renderer", &has_svg_renderer, "Get svg_renderer status");
     def("has_grid_renderer", &has_grid_renderer, "Get grid_renderer status");
     def("has_cairo", &has_cairo, "Get cairo library status");
     def("has_pycairo", &has_pycairo, "Get pycairo module status");
