@@ -390,7 +390,8 @@ opts.AddVariables(
     BoolVariable('FRAMEWORK_PYTHON', 'Link against Framework Python on Mac OS X', 'True'),
     BoolVariable('PYTHON_DYNAMIC_LOOKUP', 'On OSX, do not directly link python lib, but rather dynamically lookup symbols', 'True'),
     ('FRAMEWORK_SEARCH_PATH','Custom framework search path on Mac OS X', ''),
-    BoolVariable('FULL_LIB_PATH', 'Use the full path for the libmapnik.dylib "install_name" when linking on Mac OS X', 'True'),
+    BoolVariable('FULL_LIB_PATH', 'Embed the full and absolute path to libmapnik when linking ("install_name" on OS X/rpath on Linux)', 'True'),
+    BoolVariable('ENABLE_SONAME', 'Embed a soname in libmapnik on Linux', 'True'),
     ListVariable('BINDINGS','Language bindings to build','all',['python']),
     EnumVariable('THREADING','Set threading support','multi', ['multi','single']),
     EnumVariable('XMLPARSER','Set xml parser','libxml2', ['libxml2','ptree']),
@@ -766,16 +767,20 @@ def FindBoost(context, prefixes, thread_flag):
     if BOOST_LIB_DIR:
         msg += '\nFound boost libs: %s' % BOOST_LIB_DIR
         env['BOOST_LIBS'] = BOOST_LIB_DIR
-    else:
+    elif not env['BOOST_LIBS']:
         env['BOOST_LIBS'] = '/usr/' + env['LIBDIR_SCHEMA']
         msg += '\nUsing default boost lib dir: %s' % env['BOOST_LIBS']
+    else:
+        msg += '\nUsing boost lib dir: %s' % env['BOOST_LIBS']
 
     if BOOST_INCLUDE_DIR:
         msg += '\nFound boost headers: %s' % BOOST_INCLUDE_DIR
         env['BOOST_INCLUDES'] = BOOST_INCLUDE_DIR
-    else:
+    elif not env['BOOST_INCLUDES']:
         env['BOOST_INCLUDES'] = '/usr/include'
         msg += '\nUsing default boost include dir: %s' % env['BOOST_INCLUDES']
+    else:
+        msg += '\nUsing boost include dir: %s' % env['BOOST_INCLUDES']
 
     if not env['BOOST_TOOLKIT'] and not env['BOOST_ABI'] and not env['BOOST_VERSION']:
         if BOOST_APPEND:
@@ -928,7 +933,11 @@ int main()
 
 def boost_regex_has_icu(context):
     if env['RUNTIME_LINK'] == 'static':
-        context.env.AppendUnique(LIBS='icudata')
+        # re-order icu libs to ensure linux linker is happy
+        for lib_name in ['icui18n',env['ICU_LIB_NAME'],'icudata']:
+            if lib_name in context.env['LIBS']:
+                context.env['LIBS'].remove(lib_name)
+            context.env.Append(LIBS=lib_name)
     ret = context.TryRun("""
 
 #include <boost/regex/icu.hpp>
@@ -1363,7 +1372,6 @@ if not preconfigured:
         # http://lists.boost.org/Archives/boost/2009/03/150076.php
         # we need libicui18n if using static boost libraries, so it is
         # important to try this check with the library linked
-        env.AppendUnique(LIBS='icui18n')
         if conf.boost_regex_has_icu():
             # TODO - should avoid having this be globally defined...
             env.Append(CPPDEFINES = '-DBOOST_REGEX_HAS_ICU')
@@ -1711,6 +1719,10 @@ if not preconfigured:
         debug_defines = ['-DDEBUG', '-DMAPNIK_DEBUG']
         ndebug_defines = ['-DNDEBUG']
 
+        # faster compile
+        # http://www.boost.org/doc/libs/1_47_0/libs/spirit/doc/html/spirit/what_s_new/spirit_2_5.html#spirit.what_s_new.spirit_2_5.breaking_changes
+        env.Append(CPPDEFINES = '-DBOOST_SPIRIT_NO_PREDEFINED_TERMINALS=1')
+        env.Append(CPPDEFINES = '-DBOOST_PHOENIX_NO_PREDEFINED_TERMINALS=1')
         # c++11 support / https://github.com/mapnik/mapnik/issues/1683
         #  - upgrade to PHOENIX_V3 since that is needed for c++11 compile
         env.Append(CPPDEFINES = '-DBOOST_SPIRIT_USE_PHOENIX_V3=1')
@@ -1760,10 +1772,6 @@ if not preconfigured:
         # Common flags for g++/clang++ CXX compiler.
         # TODO: clean up code more to make -Wsign-conversion -Wconversion -Wshadow viable
         common_cxx_flags = '-Wall -Wsign-compare %s %s -ftemplate-depth-300 ' % (env['WARNING_CXXFLAGS'], pthread)
-
-        # https://github.com/mapnik/mapnik/issues/1835
-        if sys.platform == 'darwin' and env['CXX'] == 'g++':
-            common_cxx_flags += '-fpermissive '
 
         if env['DEBUG']:
             env.Append(CXXFLAGS = common_cxx_flags + '-O0 -fno-inline')

@@ -52,21 +52,30 @@ libmapnik_defines = copy(lib_env['CPPDEFINES'])
 
 ABI_VERSION = env['ABI_VERSION']
 
+enabled_imaging_libraries = []
 filesystem = 'boost_filesystem%s' % env['BOOST_APPEND']
 regex = 'boost_regex%s' % env['BOOST_APPEND']
 system = 'boost_system%s' % env['BOOST_APPEND']
 
 # clear out and re-set libs for this env
-lib_env['LIBS'] = ['freetype',env['ICU_LIB_NAME'],filesystem,system,regex,'harfbuzz', 'harfbuzz-icu']
+# note: order matters on linux: see lorder | tsort
+lib_env['LIBS'] = [filesystem,regex]
 
-if '-DMAPNIK_USE_PROJ4' in env['CPPDEFINES']:
-   lib_env['LIBS'].append('proj')
+if env['HAS_CAIRO']:
+    lib_env.Append(LIBS=env['CAIRO_ALL_LIBS'])
 
-enabled_imaging_libraries = []
+# maybe bz2
+if len(env['EXTRA_FREETYPE_LIBS']):
+    lib_env['LIBS'].extend(copy(env['EXTRA_FREETYPE_LIBS']))
+
+lib_env['LIBS'].append('harfbuzz-icu')
 
 if '-DHAVE_PNG' in env['CPPDEFINES']:
    lib_env['LIBS'].append('png')
    enabled_imaging_libraries.append('png_reader.cpp')
+
+if '-DMAPNIK_USE_PROJ4' in env['CPPDEFINES']:
+   lib_env['LIBS'].append('proj')
 
 if '-DHAVE_TIFF' in env['CPPDEFINES']:
    lib_env['LIBS'].append('tiff')
@@ -76,39 +85,47 @@ if '-DHAVE_WEBP' in env['CPPDEFINES']:
    lib_env['LIBS'].append('webp')
    enabled_imaging_libraries.append('webp_reader.cpp')
 
-if '-DHAVE_JPEG' in env['CPPDEFINES']:
-   lib_env['LIBS'].append('jpeg')
-   enabled_imaging_libraries.append('jpeg_reader.cpp')
-
-if len(env['EXTRA_FREETYPE_LIBS']):
-    lib_env['LIBS'].extend(copy(env['EXTRA_FREETYPE_LIBS']))
-
 lib_env['LIBS'].append('xml2')
-lib_env['LIBS'].append('z')
-
-#if env['THREADING'] == 'multi':
-#    lib_env['LIBS'].append('boost_thread%s' % env['BOOST_APPEND'])
 
 if '-DBOOST_REGEX_HAS_ICU' in env['CPPDEFINES']:
     lib_env['LIBS'].append('icui18n')
 
+lib_env['LIBS'].append(system)
+
+lib_env['LIBS'].append('harfbuzz')
+
+if '-DHAVE_JPEG' in env['CPPDEFINES']:
+   lib_env['LIBS'].append('jpeg')
+   enabled_imaging_libraries.append('jpeg_reader.cpp')
+
+lib_env['LIBS'].append(env['ICU_LIB_NAME'])
+
+lib_env['LIBS'].append('freetype')
+
 if env['RUNTIME_LINK'] == 'static':
+    if env['PLATFORM'] == 'Linux':
+        lib_env['LINKFLAGS'].append('-pthread')
     if 'icuuc' in env['ICU_LIB_NAME']:
         lib_env['LIBS'].append('icudata')
-else:
+
+if env['RUNTIME_LINK'] != 'static':
     lib_env['LIBS'].insert(0, 'agg')
+
+lib_env['LIBS'].append('z')
 
 if env['PLATFORM'] == 'Darwin':
     mapnik_libname = env.subst(env['MAPNIK_LIB_NAME'])
     if env['FULL_LIB_PATH']:
         lib_path = '%s/%s' % (env['MAPNIK_LIB_BASE'],mapnik_libname)
     else:
-        lib_path = mapnik_libname
+        lib_path = '@loader_path/'+mapnik_libname
     mapnik_lib_link_flag += ' -Wl,-install_name,%s' % lib_path
     _d = {'version':env['MAPNIK_VERSION_STRING'].replace('-pre','')}
     mapnik_lib_link_flag += ' -current_version %(version)s -compatibility_version %(version)s' % _d
 else: # unix, non-macos
-    mapnik_libname = env.subst(env['MAPNIK_LIB_NAME']) + (".%d.%d" % (int(ABI_VERSION[0]),int(ABI_VERSION[1])))
+    mapnik_libname = env.subst(env['MAPNIK_LIB_NAME'])
+    if env['ENABLE_SONAME']:
+        mapnik_libname = env.subst(env['MAPNIK_LIB_NAME']) + (".%d.%d" % (int(ABI_VERSION[0]),int(ABI_VERSION[1])))
     if env['PLATFORM'] == 'SunOS':
         if env['CXX'].startswith('CC'):
             mapnik_lib_link_flag += ' -R. -h %s' % mapnik_libname
@@ -116,7 +133,13 @@ else: # unix, non-macos
             mapnik_lib_link_flag += ' -Wl,-h,%s' %  mapnik_libname
     else: # Linux and others
         lib_env['LIBS'].append('dl')
-        mapnik_lib_link_flag += ' -Wl,-rpath-link,. -Wl,-soname,%s' % mapnik_libname
+        mapnik_lib_link_flag += ' -Wl,-rpath-link,.'
+        if env['ENABLE_SONAME']:
+            mapnik_lib_link_flag += ' -Wl,-soname,%s' % mapnik_libname
+        if env['FULL_LIB_PATH']:
+            mapnik_lib_link_flag += ' -Wl,-rpath=%s' % env['MAPNIK_LIB_BASE']
+        else:
+            mapnik_lib_link_flag += ' -Wl,-z,origin -Wl,-rpath=\$$ORIGIN'
 
 source = Split(
     """
@@ -261,7 +284,6 @@ if env['PLUGIN_LINKING'] == 'static':
 
 if env['HAS_CAIRO']:
     lib_env.AppendUnique(LIBPATH=env['CAIRO_LIBPATHS'])
-    lib_env.Append(LIBS=env['CAIRO_ALL_LIBS'])
     lib_env.Append(CPPDEFINES = '-DHAVE_CAIRO')
     libmapnik_defines.append('-DHAVE_CAIRO')
     lib_env.AppendUnique(CPPPATH=copy(env['CAIRO_CPPPATHS']))
@@ -340,36 +362,13 @@ if env['SVG_RENDERER']: # svg backend
     lib_env.Append(CPPDEFINES = '-DSVG_RENDERER')
     libmapnik_defines.append('-DSVG_RENDERER')
 
-if env.get('BOOST_LIB_VERSION_FROM_HEADER'):
-    boost_version_from_header = int(env['BOOST_LIB_VERSION_FROM_HEADER'].split('_')[1])
-    if boost_version_from_header < 46:
-        # avoid ubuntu issue with boost interprocess:
-        # https://github.com/mapnik/mapnik/issues/1001
-        env4 = lib_env.Clone()
-        env4.Append(CXXFLAGS = '-fpermissive')
-        cpp ='mapped_memory_cache.cpp'
-        source.remove(cpp)
-        if env['LINKING'] == 'static':
-            source.insert(0,env4.StaticObject(cpp))
-        else:
-            source.insert(0,env4.SharedObject(cpp))
-
 if env['XMLPARSER'] == 'libxml2' and env['HAS_LIBXML2']:
     source += Split(
         """
         libxml2_loader.cpp
         """)
-    env2 = lib_env.Clone()
-    env2.Append(CPPDEFINES = '-DHAVE_LIBXML2')
+    lib_env.Append(CPPDEFINES = '-DHAVE_LIBXML2')
     libmapnik_defines.append('-DHAVE_LIBXML2')
-    fixup = ['libxml2_loader.cpp']
-    for cpp in fixup:
-        if cpp in source:
-            source.remove(cpp)
-        if env['LINKING'] == 'static':
-            source.insert(0,env2.StaticObject(cpp))
-        else:
-            source.insert(0,env2.SharedObject(cpp))
 else:
     source += Split(
         """
@@ -390,7 +389,7 @@ env['LIBMAPNIK_DEFINES'] = libmapnik_defines
 
 mapnik = None
 
-if env['PLATFORM'] == 'Darwin':
+if env['PLATFORM'] == 'Darwin' or not env['ENABLE_SONAME']:
     target_path = env['MAPNIK_LIB_BASE_DEST']
     if 'uninstall' not in COMMAND_LINE_TARGETS:
         if env['LINKING'] == 'static':

@@ -20,6 +20,9 @@ def configure(conf):
     conf.env.MAPNIK_VERSION_STRING = VERSION
 
     conf.env.append_value('CXXFLAGS', ['-std=c++11'])
+    conf.env.append_value('CXXFLAGS', ['-DBOOST_SPIRIT_NO_PREDEFINED_TERMINALS=1'])
+    conf.env.append_value('CXXFLAGS', ['-DBOOST_PHOENIX_NO_PREDEFINED_TERMINALS=1'])
+    conf.env.append_value('CXXFLAGS', ['-DBOOST_SPIRIT_USE_PHOENIX_V3=1'])
 
     # python bindings
     conf.check_python_version((2,2,0))

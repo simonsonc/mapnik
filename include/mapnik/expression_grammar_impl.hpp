@@ -30,7 +30,6 @@
 #include <mapnik/value_types.hpp>
 
 // boost
-#include <boost/version.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_object.hpp>
@@ -72,21 +71,18 @@ expression_grammar<Iterator>::expression_grammar(mapnik::transcoder const& tr)
       regex_replace_(regex_replace_impl(tr))
 {
     using boost::phoenix::construct;
-    using qi::_1;
-    using qi::_a;
-    using qi::_b;
-    using qi::_r1;
-#if BOOST_VERSION > 104200
-    using qi::no_skip;
-#endif
-    using qi::lexeme;
-    using qi::_val;
-    using qi::lit;
-    using qi::double_;
-    using qi::hex;
-    using qi::omit;
-    using standard_wide::char_;
-    using standard_wide::no_case;
+    qi::_1_type _1;
+    qi::_a_type _a;
+    qi::_b_type _b;
+    qi::_r1_type _r1;
+    qi::no_skip_type no_skip;
+    qi::_val_type _val;
+    qi::lit_type lit;
+    qi::double_type double_;
+    qi::hex_type hex;
+    qi::omit_type omit;
+    standard_wide::char_type char_;
+    standard_wide::no_case_type no_case;
 
     expr = logical_expr.alias();
 
@@ -173,18 +169,11 @@ expression_grammar<Iterator>::expression_grammar(mapnik::transcoder const& tr)
         ("\\\'", '\'')("\\\"", '\"')
         ;
 
-#if BOOST_VERSION > 104500
     quote_char %= char_('\'') | char_('"');
     ustring %= omit[quote_char[_a = _1]]
         >> *(unesc_char | "\\x" >> hex | (char_ - lit(_a)))
         >> lit(_a);
     attr %= '[' >> no_skip[+~char_(']')] >> ']';
-#else
-    ustring %= lit('\'')
-        >> *(unesc_char | "\\x" >> hex | (char_ - lit('\'')))
-        >> lit('\'');
-    attr %= '[' >> lexeme[+(char_ - ']')] >> ']';
-#endif
 
 }
 

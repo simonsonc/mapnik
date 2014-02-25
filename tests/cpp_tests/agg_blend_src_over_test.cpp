@@ -1,7 +1,7 @@
-#include <boost/version.hpp>
 #include <boost/detail/lightweight_test.hpp>
 #include <iostream>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -33,7 +33,7 @@ color blend(color const& source, color const& dest, unsigned cover=255)
     dest_pre.premultiply();
 
     unsigned char* buffer = new unsigned char[size*size*stride];
-    memset(buffer, 0, size*size*stride);
+    std::memset(buffer, 0, size*size*stride);
     buffer[0] = dest_pre.r;
     buffer[1] = dest_pre.g;
     buffer[2] = dest_pre.b;
@@ -63,7 +63,7 @@ color normal_blend(color const& source, color const& dest, unsigned cover=255)
     dest_pre.premultiply();
     // source buffer
     unsigned char* source_buffer = new unsigned char[size*size*stride];
-    memset(source_buffer, 0, size*size*stride);
+    std::memset(source_buffer, 0, size*size*stride);
     source_buffer[0] = source_pre.r;
     source_buffer[1] = source_pre.g;
     source_buffer[2] = source_pre.b;
@@ -73,7 +73,7 @@ color normal_blend(color const& source, color const& dest, unsigned cover=255)
 
     // destination buffer
     unsigned char* dest_buffer = new unsigned char[size*size*stride];
-    memset(dest_buffer, 0, size*size*stride);
+    std::memset(dest_buffer, 0, size*size*stride);
     dest_buffer[0] = dest_pre.r;
     dest_buffer[1] = dest_pre.g;
     dest_buffer[2] = dest_pre.b;
@@ -205,9 +205,7 @@ int main(int argc, char** argv)
     if (!::boost::detail::test_errors()) {
         if (quiet) std::clog << "\x1b[1;32m.\x1b[0m";
         else std::clog << "C++ AGG blending: \x1b[1;32m✓ \x1b[0m\n";
-#if BOOST_VERSION >= 104600
         ::boost::detail::report_errors_remind().called_report_errors_function = true;
-#endif
     } else {
         std::clog << "C++ AGG blending: ";
         return ::boost::report_errors();
