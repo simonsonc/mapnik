@@ -23,6 +23,7 @@
 #if defined(HAVE_CAIRO)
 
 // mapnik
+#include <mapnik/std.hpp>
 #include <mapnik/rule.hpp>
 #include <mapnik/debug.hpp>
 #include <mapnik/layer.hpp>
@@ -314,7 +315,7 @@ void cairo_renderer_base::process(polygon_symbolizer const& sym,
     context_.set_color(sym.get_fill(), sym.get_opacity());
 
     agg::trans_affine tr;
-    evaluate_transform(tr, feature, sym.get_transform());
+    evaluate_transform(tr, feature, sym.get_transform(), scale_factor_);
 
     typedef boost::mpl::vector<clip_poly_tag,transform_tag,affine_transform_tag,simplify_tag,smooth_tag> conv_types;
     vertex_converter<box2d<double>, cairo_context, polygon_symbolizer,
@@ -361,8 +362,8 @@ void cairo_renderer_base::process(building_symbolizer const& sym,
 
         if (geom.size() > 2)
         {
-            const std::unique_ptr<geometry_type> frame(new geometry_type(geometry_type::types::LineString));
-            const std::unique_ptr<geometry_type> roof(new geometry_type(geometry_type::types::Polygon));
+            const auto frame = std::make_unique<geometry_type>(geometry_type::types::LineString);
+            const auto roof = std::make_unique<geometry_type>(geometry_type::types::Polygon);
             std::deque<segment_t> face_segments;
             double x0 = 0;
             double y0 = 0;
@@ -392,7 +393,7 @@ void cairo_renderer_base::process(building_symbolizer const& sym,
 
             for (auto const& seg : face_segments)
             {
-                const std::unique_ptr<geometry_type> faces(new geometry_type(geometry_type::types::Polygon));
+                const auto faces = std::make_unique<geometry_type>(geometry_type::types::Polygon);
                 faces->move_to(std::get<0>(seg), std::get<1>(seg));
                 faces->line_to(std::get<2>(seg), std::get<3>(seg));
                 faces->line_to(std::get<2>(seg), std::get<3>(seg) + height);
@@ -465,7 +466,7 @@ void cairo_renderer_base::process(line_symbolizer const& sym,
     }
 
     agg::trans_affine tr;
-    evaluate_transform(tr, feature, sym.get_transform());
+    evaluate_transform(tr, feature, sym.get_transform(), scale_factor_);
 
     box2d<double> clipping_extent = query_extent_;
     if (sym.clip())
@@ -847,7 +848,7 @@ void cairo_renderer_base::process(polygon_pattern_symbolizer const& sym,
     //}
 
     agg::trans_affine tr;
-    evaluate_transform(tr, feature, sym.get_transform());
+    evaluate_transform(tr, feature, sym.get_transform(), scale_factor_);
 
     typedef boost::mpl::vector<clip_poly_tag,transform_tag,affine_transform_tag,simplify_tag,smooth_tag> conv_types;
     vertex_converter<box2d<double>, cairo_context, polygon_pattern_symbolizer,
@@ -1156,7 +1157,7 @@ void cairo_renderer_base::process(markers_symbolizer const& sym,
         if (mark && *mark)
         {
             agg::trans_affine geom_tr;
-            evaluate_transform(geom_tr, feature, sym.get_transform());
+            evaluate_transform(geom_tr, feature, sym.get_transform(), scale_factor_);
             box2d<double> const& bbox = (*mark)->bounding_box();
             setup_transform_scaling(tr, bbox.width(), bbox.height(), feature, sym);
             evaluate_transform(tr, feature, sym.get_image_transform());
