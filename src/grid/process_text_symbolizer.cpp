@@ -20,9 +20,13 @@
  *
  *****************************************************************************/
 
+#if defined(GRID_RENDERER)
+
 // mapnik
+#include <mapnik/feature.hpp>
 #include <mapnik/grid/grid_renderer.hpp>
 #include <mapnik/text/symbolizer_helpers.hpp>
+#include <mapnik/pixel_position.hpp>
 #include <mapnik/text/renderer.hpp>
 
 namespace mapnik {
@@ -32,22 +36,35 @@ void grid_renderer<T>::process(text_symbolizer const& sym,
                                mapnik::feature_impl & feature,
                                proj_transform const& prj_trans)
 {
+    agg::trans_affine tr;
+    auto transform = get_optional<transform_type>(sym, keys::geometry_transform);
+    if (transform) evaluate_transform(tr, feature, common_.vars_, *transform, common_.scale_factor_);
     text_symbolizer_helper helper(
-            sym, feature, prj_trans,
-            width_, height_,
-            scale_factor_ * (1.0/pixmap_.get_resolution()),
-            t_, font_manager_, *detector_,
-            query_extent_);
+            sym, feature, common_.vars_, prj_trans,
+            common_.width_, common_.height_,
+            common_.scale_factor_ * (1.0/pixmap_.get_resolution()),
+            common_.t_, common_.font_manager_, *common_.detector_,
+            common_.query_extent_, tr);
+    bool placement_found = false;
 
-    grid_text_renderer<T> ren(pixmap_, sym.comp_op(), scale_factor_);
+    composite_mode_e comp_op = get<composite_mode_e>(sym, keys::comp_op, feature, common_.vars_, src_over);
+
+    grid_text_renderer<T> ren(pixmap_,
+                              comp_op,
+                              common_.scale_factor_);
 
     placements_list const& placements = helper.get();
-    if (!placements.size()) return;
+    value_integer feature_id = feature.id();
+
     for (glyph_positions_ptr glyphs : placements)
     {
-        ren.render(*glyphs, feature.id());
+        ren.render(*glyphs, feature_id);
+        placement_found = true;
     }
-    pixmap_.add_feature(feature);
+    if (placement_found)
+    {
+        pixmap_.add_feature(feature);
+    }
 }
 
 template void grid_renderer<grid>::process(text_symbolizer const&,
@@ -55,3 +72,5 @@ template void grid_renderer<grid>::process(text_symbolizer const&,
                                            proj_transform const&);
 
 }
+
+#endif

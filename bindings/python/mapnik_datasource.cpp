@@ -20,6 +20,8 @@
  *
  *****************************************************************************/
 
+#include <mapnik/config.hpp>
+
 // boost
 #include "boost_std_shared_shim.hpp"
 #include <boost/python.hpp>
@@ -41,6 +43,7 @@ using mapnik::datasource;
 using mapnik::memory_datasource;
 using mapnik::layer_descriptor;
 using mapnik::attribute_descriptor;
+using mapnik::parameters;
 
 namespace
 {
@@ -184,13 +187,14 @@ void export_datasource()
         .def("params",make_function(params_const,return_value_policy<copy_const_reference>()),
              "The configuration parameters of the data source. "
              "These vary depending on the type of data source.")
+        .def(self == self)
         ;
 
     def("CreateDatasource",&create_datasource);
 
     class_<memory_datasource,
            bases<datasource>, std::shared_ptr<memory_datasource>,
-           boost::noncopyable>("MemoryDatasource", init<>())
+           boost::noncopyable>("MemoryDatasourceBase", init<parameters>())
         .def("add_feature",&memory_datasource::push,
              "Adds a Feature:\n"
              ">>> ms = MemoryDatasource()\n"

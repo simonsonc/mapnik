@@ -27,28 +27,26 @@
 #include <algorithm>
 
 // boost
-#include <boost/variant.hpp>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/spirit/include/support_multi_pass.hpp>
-
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/geometries/geometries.hpp>
-#include <boost/geometry.hpp>
-#include <boost/geometry/extensions/index/rtree/rtree.hpp>
 
 // mapnik
 #include <mapnik/unicode.hpp>
 #include <mapnik/value_types.hpp>
 #include <mapnik/box2d.hpp>
 #include <mapnik/json/topojson_grammar.hpp>
+#include <mapnik/json/topojson_grammar_impl.hpp>
 #include <mapnik/json/topojson_utils.hpp>
+#include <mapnik/util/variant.hpp>
+#include <mapnik/make_unique.hpp>
 
 using mapnik::datasource;
 using mapnik::parameters;
 
 DATASOURCE_PLUGIN(topojson_datasource)
 
-struct attr_value_converter : public boost::static_visitor<mapnik::eAttributeType>
+struct attr_value_converter : public mapnik::util::static_visitor<mapnik::eAttributeType>
 {
     mapnik::eAttributeType operator() (mapnik::value_integer /*val*/) const
     {
@@ -86,7 +84,7 @@ struct attr_value_converter : public boost::static_visitor<mapnik::eAttributeTyp
     }
 };
 
-struct geometry_type_visitor : public boost::static_visitor<int>
+struct geometry_type_visitor : public mapnik::util::static_visitor<int>
 {
     int operator() (mapnik::topojson::point const&) const
     {
@@ -118,7 +116,7 @@ struct geometry_type_visitor : public boost::static_visitor<int>
     }
 };
 
-struct collect_attributes_visitor : public boost::static_visitor<void>
+struct collect_attributes_visitor : public mapnik::util::static_visitor<void>
 {
     mapnik::layer_descriptor & desc_;
     collect_attributes_visitor(mapnik::layer_descriptor & desc):
@@ -134,7 +132,8 @@ struct collect_attributes_visitor : public boost::static_visitor<void>
             for (auto const& p : *g.props)
             {
                 desc_.add_descriptor(mapnik::attribute_descriptor(std::get<0>(p),
-                    boost::apply_visitor(attr_value_converter(),std::get<1>(p))));
+                                                                  mapnik::util::apply_visitor(attr_value_converter(),
+                                                                                              std::get<1>(p))));
             }
         }
     }
@@ -143,67 +142,107 @@ struct collect_attributes_visitor : public boost::static_visitor<void>
 topojson_datasource::topojson_datasource(parameters const& params)
   : datasource(params),
     type_(datasource::Vector),
-    desc_(*params.get<std::string>("type"),
+    desc_(topojson_datasource::name(),
           *params.get<std::string>("encoding","utf-8")),
-    file_(*params.get<std::string>("file","")),
+    filename_(),
+    inline_string_(),
     extent_(),
     tr_(new mapnik::transcoder(*params.get<std::string>("encoding","utf-8"))),
-    tree_(16,1)
+    tree_(nullptr)
 {
-    if (file_.empty()) throw mapnik::datasource_exception("TopoJSON Plugin: missing <file> parameter");
-
-    boost::optional<std::string> base = params.get<std::string>("base");
-    if (base)
+    boost::optional<std::string> inline_string = params.get<std::string>("inline");
+    if (inline_string)
     {
-        file_ = *base + "/" + file_;
+        inline_string_ = *inline_string;
     }
+    else
+    {
+        boost::optional<std::string> file = params.get<std::string>("file");
+        if (!file) throw mapnik::datasource_exception("TopoJSON Plugin: missing <file> parameter");
 
-    typedef std::istreambuf_iterator<char> base_iterator_type;
-
+        boost::optional<std::string> base = params.get<std::string>("base");
+        if (base)
+            filename_ = *base + "/" + *file;
+        else
+            filename_ = *file;
+    }
+    if (!inline_string_.empty())
+    {
+        std::istringstream in(inline_string_);
+        parse_topojson(in);
+    }
+    else
+    {
 #if defined (_WINDOWS)
-    std::ifstream is(mapnik::utf8_to_utf16(file_),std::ios_base::in | std::ios_base::binary);
+        std::ifstream in(mapnik::utf8_to_utf16(filename_),std::ios_base::in | std::ios_base::binary);
 #else
-    std::ifstream is(file_.c_str(),std::ios_base::in | std::ios_base::binary);
+        std::ifstream in(filename_.c_str(),std::ios_base::in | std::ios_base::binary);
 #endif
-    if (!is.is_open())
-    {
-        throw mapnik::datasource_exception("TopoJSON Plugin: could not open: '" + file_ + "'");
+        if (!in.is_open())
+        {
+            throw mapnik::datasource_exception("TopoJSON Plugin: could not open: '" + filename_ + "'");
+        }
+        parse_topojson(in);
+        in.close();
     }
+}
 
+template <typename T>
+void topojson_datasource::parse_topojson(T & stream)
+{
+    using base_iterator_type = std::istreambuf_iterator<char>;
     boost::spirit::multi_pass<base_iterator_type> begin =
-        boost::spirit::make_default_multi_pass(base_iterator_type(is));
+        boost::spirit::make_default_multi_pass(base_iterator_type(stream));
 
     boost::spirit::multi_pass<base_iterator_type> end =
         boost::spirit::make_default_multi_pass(base_iterator_type());
 
-    mapnik::topojson::topojson_grammar<boost::spirit::multi_pass<base_iterator_type> > g;
+    static const mapnik::topojson::topojson_grammar<boost::spirit::multi_pass<base_iterator_type> > g;
     boost::spirit::standard_wide::space_type space;
     bool result = boost::spirit::qi::phrase_parse(begin, end, g, space, topo_);
     if (!result)
     {
-        throw mapnik::datasource_exception("topojson_datasource: Failed parse TopoJSON file '" + file_ + "'");
+        throw mapnik::datasource_exception("topojson_datasource: Failed parse TopoJSON file '" + filename_ + "'");
     }
 
-    std::size_t count = 0;
+#if BOOST_VERSION >= 105600
+    using values_container = std::vector< std::pair<box_type, std::size_t> >;
+    values_container values;
+    values.reserve(topo_.geometries.size());
+#else
+    tree_ = std::make_unique<spatial_index_type>(16, 4);
+#endif
+
+    std::size_t geometry_index = 0;
+
     for (auto const& geom : topo_.geometries)
     {
-        mapnik::box2d<double> bbox = boost::apply_visitor(mapnik::topojson::bounding_box_visitor(topo_), geom);
-        if (bbox.valid())
+        mapnik::box2d<double> box = mapnik::util::apply_visitor(mapnik::topojson::bounding_box_visitor(topo_), geom);
+        if (box.valid())
         {
-            if (count == 0)
+            if (geometry_index == 0)
             {
-                extent_ = bbox;
+                extent_ = box;
                 collect_attributes_visitor assessor(desc_);
-                boost::apply_visitor(assessor,geom);
+                mapnik::util::apply_visitor( std::ref(assessor), geom);
             }
             else
             {
-                extent_.expand_to_include(bbox);
+                extent_.expand_to_include(box);
             }
-            tree_.insert(box_type(point_type(bbox.minx(),bbox.miny()),point_type(bbox.maxx(),bbox.maxy())), count);
         }
-        ++count;
+#if BOOST_VERSION >= 105600
+        values.emplace_back(box_type(point_type(box.minx(),box.miny()),point_type(box.maxx(),box.maxy())), geometry_index);
+#else
+        tree_->insert(box_type(point_type(box.minx(),box.miny()),point_type(box.maxx(),box.maxy())),geometry_index);
+#endif
+        ++geometry_index;
     }
+
+#if BOOST_VERSION >= 105600
+    // packing algorithm
+    tree_ = std::make_unique<spatial_index_type>(values);
+#endif
 }
 
 topojson_datasource::~topojson_datasource() { }
@@ -221,7 +260,7 @@ boost::optional<mapnik::datasource::geometry_t> topojson_datasource::get_geometr
     for (std::size_t i = 0; i < num_features && i < 5; ++i)
     {
         mapnik::topojson::geometry const& geom = topo_.geometries[i];
-        int type = boost::apply_visitor(geometry_type_visitor(),geom);
+        int type = mapnik::util::apply_visitor(geometry_type_visitor(),geom);
         if (type > 0)
         {
             if (multi_type > 0 && multi_type != type)
@@ -261,7 +300,19 @@ mapnik::featureset_ptr topojson_datasource::features(mapnik::query const& q) con
     if (extent_.intersects(b))
     {
         box_type box(point_type(b.minx(),b.miny()),point_type(b.maxx(),b.maxy()));
-        return std::make_shared<topojson_featureset>(topo_, *tr_, tree_.find(box));
+#if BOOST_VERSION >= 105600
+        topojson_featureset::array_type index_array;
+        if (tree_)
+        {
+            tree_->query(boost::geometry::index::intersects(box),std::back_inserter(index_array));
+            return std::make_shared<topojson_featureset>(topo_, *tr_, std::move(index_array));
+        }
+#else
+        if (tree_)
+        {
+            return std::make_shared<topojson_featureset>(topo_, *tr_, tree_->find(box));
+        }
+#endif
     }
     // otherwise return an empty featureset pointer
     return mapnik::featureset_ptr();

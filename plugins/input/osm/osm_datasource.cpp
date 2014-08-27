@@ -52,7 +52,7 @@ osm_datasource::osm_datasource(const parameters& params)
     : datasource (params),
       extent_(),
       type_(datasource::Vector),
-      desc_(*params.get<std::string>("type"), *params.get<std::string>("encoding", "utf-8"))
+      desc_(osm_datasource::name(), *params.get<std::string>("encoding", "utf-8"))
 {
     osm_data_ = nullptr;
     std::string osm_filename = *params.get<std::string>("file", "");
@@ -63,13 +63,7 @@ osm_datasource::osm_datasource(const parameters& params)
     // load the data
     if (url != "" && bbox != "")
     {
-        // if we supplied a url and a bounding box, load from the url
-        MAPNIK_LOG_DEBUG(osm) << "osm_datasource: loading_from_url url=" << url << ",bbox=" << bbox;
-
-        if ((osm_data_ = dataset_deliverer::load_from_url(url, bbox, parser)) == nullptr)
-        {
-            throw datasource_exception("Error loading from URL");
-        }
+        throw datasource_exception("Error loading from URL is no longer supported (removed in >= Mapnik 2.3.x");
     }
     else if (osm_filename != "")
     {
@@ -143,21 +137,15 @@ featureset_ptr osm_datasource::features_at_point(coord2d const& pt, double tol) 
 {
     filter_at_point filter(pt);
     // collect all attribute names
-    std::vector<attribute_descriptor> const& desc_vector = desc_.get_descriptors();
-    std::vector<attribute_descriptor>::const_iterator itr = desc_vector.begin();
-    std::vector<attribute_descriptor>::const_iterator end = desc_vector.end();
     std::set<std::string> names;
-
-    while (itr != end)
+    for (auto const& elem : desc_.get_descriptors())
     {
-        names.insert(itr->get_name());
-        ++itr;
+        names.insert(elem.get_name());
     }
-
     return std::make_shared<osm_featureset<filter_at_point> >(filter,
-                                                                osm_data_,
-                                                                names,
-                                                                desc_.get_encoding());
+                                                              osm_data_,
+                                                              names,
+                                                              desc_.get_encoding());
 }
 
 box2d<double> osm_datasource::envelope() const

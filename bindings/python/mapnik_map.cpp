@@ -20,8 +20,9 @@
  *
  *****************************************************************************/
 
-#include "boost_std_shared_shim.hpp"
+#include <mapnik/config.hpp>
 
+#include "boost_std_shared_shim.hpp"
 // boost
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -46,6 +47,16 @@ using mapnik::Map;
 std::vector<layer>& (Map::*layers_nonconst)() =  &Map::layers;
 std::vector<layer> const& (Map::*layers_const)() const =  &Map::layers;
 mapnik::parameters& (Map::*params_nonconst)() =  &Map::get_extra_parameters;
+
+void insert_style(mapnik::Map & m, std::string const& name, mapnik::feature_type_style const& style)
+{
+    m.insert_style(name,style);
+}
+
+void insert_fontset(mapnik::Map & m, std::string const& name, mapnik::font_set const& fontset)
+{
+    m.insert_fontset(name,fontset);
+}
 
 mapnik::feature_type_style find_style(mapnik::Map const& m, std::string const& name)
 {
@@ -105,15 +116,15 @@ void set_maximum_extent(mapnik::Map & m, boost::optional<mapnik::box2d<double> >
 
 struct extract_style
 {
-    typedef boost::python::tuple result_type;
+    using result_type = boost::python::tuple;
     result_type operator() (std::map<std::string, mapnik::feature_type_style>::value_type const& val) const
     {
         return boost::python::make_tuple(val.first,val.second);
     }
 };
 
-typedef boost::transform_iterator<extract_style, Map::const_style_iterator> style_extract_iterator;
-typedef std::pair<style_extract_iterator,style_extract_iterator> style_range;
+using style_extract_iterator = boost::transform_iterator<extract_style, Map::const_style_iterator>;
+using style_range = std::pair<style_extract_iterator,style_extract_iterator>;
 
 style_range _styles_ (mapnik::Map const& m)
 {
@@ -136,6 +147,7 @@ void export_map()
         .value("ADJUST_BBOX_HEIGHT",mapnik::Map::ADJUST_BBOX_HEIGHT)
         .value("ADJUST_CANVAS_WIDTH",mapnik::Map::ADJUST_CANVAS_WIDTH)
         .value("ADJUST_CANVAS_HEIGHT", mapnik::Map::ADJUST_CANVAS_HEIGHT)
+        .value("RESPECT", mapnik::Map::RESPECT)
         ;
 
     class_<std::vector<layer> >("Layers")
@@ -163,7 +175,7 @@ void export_map()
                     "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'\n"
                     ))
 
-        .def("append_style",&Map::insert_style,
+        .def("append_style",insert_style,
              (arg("style_name"),arg("style_object")),
              "Insert a Mapnik Style onto the map by appending it.\n"
              "\n"
@@ -176,7 +188,7 @@ void export_map()
              "False # you can only append styles with unique names\n"
             )
 
-        .def("append_fontset",&Map::insert_fontset,
+        .def("append_fontset",insert_fontset,
              (arg("fontset")),
              "Add a FontSet to the map."
             )
@@ -518,5 +530,7 @@ void export_map()
                       ">>> m.width\n"
                       "800\n"
             )
+        // comparison
+        .def(self == self)
         ;
 }

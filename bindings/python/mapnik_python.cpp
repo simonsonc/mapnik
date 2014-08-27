@@ -20,7 +20,10 @@
  *
  *****************************************************************************/
 
+#include <mapnik/config.hpp>
+
 #include "boost_std_shared_shim.hpp"
+#include "python_to_value.hpp"
 #include <boost/python/args.hpp>        // for keywords, arg, etc
 #include <boost/python/converter/from_python.hpp>
 #include <boost/python/def.hpp>         // for def
@@ -36,6 +39,7 @@
 
 // stl
 #include <stdexcept>
+#include <fstream>
 
 void export_color();
 void export_coord();
@@ -58,7 +62,6 @@ void export_python();
 void export_expression();
 void export_rule();
 void export_style();
-void export_stroke();
 void export_feature();
 void export_featureset();
 void export_fontset();
@@ -76,6 +79,7 @@ void export_raster_symbolizer();
 void export_text_placement();
 void export_shield_symbolizer();
 void export_debug_symbolizer();
+void export_group_symbolizer();
 void export_font_engine();
 void export_projection();
 void export_proj_transform();
@@ -83,10 +87,11 @@ void export_view_transform();
 void export_raster_colorizer();
 void export_label_collision_detector();
 void export_logger();
-void export_wkt_reader();
 
 #include <mapnik/version.hpp>
 #include <mapnik/map.hpp>
+#include <mapnik/datasource.hpp>
+#include <mapnik/layer.hpp>
 #include <mapnik/agg_renderer.hpp>
 #include <mapnik/graphics.hpp>
 #include <mapnik/rule.hpp>
@@ -99,6 +104,7 @@ void export_wkt_reader();
 #include "python_grid_utils.hpp"
 #endif
 #include "mapnik_value_converter.hpp"
+#include "mapnik_enumeration_wrapper_converter.hpp"
 #include "mapnik_threads.hpp"
 #include "python_optional.hpp"
 #include <mapnik/marker_cache.hpp>
@@ -106,9 +112,12 @@ void export_wkt_reader();
 #include <mapnik/mapped_memory_cache.hpp>
 #endif
 
+#if defined(SVG_RENDERER)
+#include <mapnik/svg/output/svg_renderer.hpp>
+#endif
+
 namespace mapnik {
     class font_set;
-    class stroke;
     class layer;
     class color;
     class label_collision_detector4;
@@ -122,7 +131,7 @@ void clear_cache()
 }
 
 #if defined(HAVE_CAIRO) && defined(HAVE_PYCAIRO)
-#include <mapnik/cairo_renderer.hpp>
+#include <mapnik/cairo/cairo_renderer.hpp>
 #include <boost/python/type_id.hpp>
 #include <boost/python/converter/registry.hpp>
 #include <pycairo.h>
@@ -182,7 +191,18 @@ void render(mapnik::Map const& map,
     python_unblock_auto_block b;
     mapnik::agg_renderer<mapnik::image_32> ren(map,image,scale_factor,offset_x, offset_y);
     ren.apply();
+}
 
+void render_with_vars(mapnik::Map const& map,
+            mapnik::image_32& image,
+            boost::python::dict const& d)
+{
+    mapnik::attributes vars = mapnik::dict2attr(d);
+    mapnik::request req(map.width(),map.height(),map.get_current_extent());
+    req.set_buffer_size(map.buffer_size());
+    python_unblock_auto_block b;
+    mapnik::agg_renderer<mapnik::image_32> ren(map,req,vars,image,1,0,0);
+    ren.apply();
 }
 
 void render_with_detector(
@@ -228,7 +248,7 @@ void render3(mapnik::Map const& map,
 {
     python_unblock_auto_block b;
     mapnik::cairo_surface_ptr surface(cairo_surface_reference(py_surface->surface), mapnik::cairo_surface_closer());
-    mapnik::cairo_renderer<mapnik::cairo_surface_ptr> ren(map,surface,scale_factor,offset_x,offset_y);
+    mapnik::cairo_renderer<mapnik::cairo_ptr> ren(map,mapnik::create_context(surface),scale_factor,offset_x,offset_y);
     ren.apply();
 }
 
@@ -236,7 +256,7 @@ void render4(mapnik::Map const& map, PycairoSurface* py_surface)
 {
     python_unblock_auto_block b;
     mapnik::cairo_surface_ptr surface(cairo_surface_reference(py_surface->surface), mapnik::cairo_surface_closer());
-    mapnik::cairo_renderer<mapnik::cairo_surface_ptr> ren(map,surface);
+    mapnik::cairo_renderer<mapnik::cairo_ptr> ren(map,mapnik::create_context(surface));
     ren.apply();
 }
 
@@ -259,7 +279,6 @@ void render6(mapnik::Map const& map, PycairoContext* py_context)
     mapnik::cairo_renderer<mapnik::cairo_ptr> ren(map,context);
     ren.apply();
 }
-
 void render_with_detector2(
     mapnik::Map const& map,
     PycairoContext* py_context,
@@ -292,7 +311,7 @@ void render_with_detector4(
 {
     python_unblock_auto_block b;
     mapnik::cairo_surface_ptr surface(cairo_surface_reference(py_surface->surface), mapnik::cairo_surface_closer());
-    mapnik::cairo_renderer<mapnik::cairo_surface_ptr> ren(map, surface, detector);
+    mapnik::cairo_renderer<mapnik::cairo_ptr> ren(map, mapnik::create_context(surface), detector);
     ren.apply();
 }
 
@@ -306,7 +325,7 @@ void render_with_detector5(
 {
     python_unblock_auto_block b;
     mapnik::cairo_surface_ptr surface(cairo_surface_reference(py_surface->surface), mapnik::cairo_surface_closer());
-    mapnik::cairo_renderer<mapnik::cairo_surface_ptr> ren(map, surface, detector, scale_factor, offset_x, offset_y);
+    mapnik::cairo_renderer<mapnik::cairo_ptr> ren(map, mapnik::create_context(surface), detector, scale_factor, offset_x, offset_y);
     ren.apply();
 }
 
@@ -328,7 +347,23 @@ void render_to_file1(mapnik::Map const& map,
                      std::string const& filename,
                      std::string const& format)
 {
-    if (format == "pdf" || format == "svg" || format =="ps" || format == "ARGB32" || format == "RGB24")
+    if (format == "svg-ng")
+    {
+#if defined(SVG_RENDERER)
+        std::ofstream file (filename.c_str(), std::ios::out|std::ios::trunc|std::ios::binary);
+        if (!file)
+        {
+            throw mapnik::ImageWriterException("could not open file for writing: " + filename);
+        }
+        using iter_type = std::ostream_iterator<char>;
+        iter_type output_stream_iterator(file);
+        mapnik::svg_renderer<iter_type> ren(map,output_stream_iterator);
+        ren.apply();
+#else
+        throw mapnik::ImageWriterException("SVG backend not available, cannot write to format: " + format);
+#endif
+    }
+    else if (format == "pdf" || format == "svg" || format =="ps" || format == "ARGB32" || format == "RGB24")
     {
 #if defined(HAVE_CAIRO)
         mapnik::save_to_cairo_file(map,filename,format,1.0);
@@ -369,7 +404,23 @@ void render_to_file3(mapnik::Map const& map,
                      double scale_factor = 1.0
     )
 {
-    if (format == "pdf" || format == "svg" || format =="ps" || format == "ARGB32" || format == "RGB24")
+    if (format == "svg-ng")
+    {
+#if defined(SVG_RENDERER)
+        std::ofstream file (filename.c_str(), std::ios::out|std::ios::trunc|std::ios::binary);
+        if (!file)
+        {
+            throw mapnik::ImageWriterException("could not open file for writing: " + filename);
+        }
+        using iter_type = std::ostream_iterator<char>;
+        iter_type output_stream_iterator(file);
+        mapnik::svg_renderer<iter_type> ren(map,output_stream_iterator,scale_factor);
+        ren.apply();
+#else
+        throw mapnik::ImageWriterException("SVG backend not available, cannot write to format: " + format);
+#endif
+    }
+    else if (format == "pdf" || format == "svg" || format =="ps" || format == "ARGB32" || format == "RGB24")
     {
 #if defined(HAVE_CAIRO)
         mapnik::save_to_cairo_file(map,filename,format,scale_factor);
@@ -565,7 +616,6 @@ BOOST_PYTHON_MODULE(_mapnik)
     export_rule();
     export_style();
     export_layer();
-    export_stroke();
     export_datasource_cache();
     export_symbolizer();
     export_markers_symbolizer();
@@ -579,6 +629,7 @@ BOOST_PYTHON_MODULE(_mapnik)
     export_text_placement();
     export_shield_symbolizer();
     export_debug_symbolizer();
+    export_group_symbolizer();
     export_font_engine();
     export_projection();
     export_proj_transform();
@@ -588,7 +639,6 @@ BOOST_PYTHON_MODULE(_mapnik)
     export_raster_colorizer();
     export_label_collision_detector();
     export_logger();
-    export_wkt_reader();
 
     def("clear_cache", &clear_cache,
         "\n"
@@ -598,17 +648,6 @@ BOOST_PYTHON_MODULE(_mapnik)
         ">>> from mapnik import clear_cache\n"
         ">>> clear_cache()\n"
         );
-
-#if defined(GRID_RENDERER)
-    def("render_grid",&mapnik::render_grid,
-        ( arg("map"),
-          arg("layer"),
-          args("key")="__id__",
-          arg("resolution")=4,
-          arg("fields")=boost::python::list()
-            )
-        );
-#endif
 
     def("render_to_file",&render_to_file1,
         "\n"
@@ -658,6 +697,7 @@ BOOST_PYTHON_MODULE(_mapnik)
         "\n"
         );
 
+    def("render_with_vars",&render_with_vars);
 
     def("render", &render, render_overloads(
             "\n"
@@ -865,7 +905,6 @@ BOOST_PYTHON_MODULE(_mapnik)
     def("has_cairo", &has_cairo, "Get cairo library status");
     def("has_pycairo", &has_pycairo, "Get pycairo module status");
 
-    python_optional<mapnik::stroke>();
     python_optional<mapnik::font_set>();
     python_optional<mapnik::color>();
     python_optional<mapnik::box2d<double> >();
@@ -882,4 +921,5 @@ BOOST_PYTHON_MODULE(_mapnik)
     register_ptr_to_python<mapnik::path_expression_ptr>();
     to_python_converter<mapnik::value_holder,mapnik_param_to_python>();
     to_python_converter<mapnik::value,mapnik_value_to_python>();
+    to_python_converter<mapnik::enumeration_wrapper,mapnik_enumeration_wrapper_to_python>();
 }

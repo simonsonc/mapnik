@@ -6,6 +6,11 @@ Developers: Please commit along with changes.
 
 For a complete change history, see the git log.
 
+## 3.x / Future
+
+- Default PNG encoding method when `png` is supplied is now `png8:m=h`, so paletted png using hextree color quantization (#2028)
+  Use `png32` now for full color png. More details at https://github.com/mapnik/mapnik/wiki/Image-IO.
+
 ## 2.3.0
 
 Released ...
@@ -13,6 +18,12 @@ Released ...
 (Packaged from ...)
 
 Summary: TODO
+
+- PostGIS: Added support for rendering 3D and 4D geometries (previously silently skipped) (#44)
+
+- AGG renderer: fixed geometry offsetting to work after smoothing to produce more consistent results (#2202)
+
+- AGG renderer: increased `vertex_dist_epsilon` to ensure nearly coincident points are discarded more readily (#2196)
 
 - GDAL plugin: Added back support for user driven `nodata` on rgb(a) images (#2023)
 

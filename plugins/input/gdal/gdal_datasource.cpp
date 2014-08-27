@@ -29,6 +29,7 @@
 #include <mapnik/geom_util.hpp>
 #include <mapnik/timer.hpp>
 #include <mapnik/value_types.hpp>
+#include <mapnik/boolean.hpp>
 
 #include <gdal_version.h>
 
@@ -76,7 +77,7 @@ inline GDALDataset* gdal_datasource::open_dataset() const
 
 gdal_datasource::gdal_datasource(parameters const& params)
     : datasource(params),
-      desc_(*params.get<std::string>("type"), "utf-8"),
+      desc_(gdal_datasource::name(), "utf-8"),
       nodata_value_(params.get<double>("nodata")),
       nodata_tolerance_(*params.get<double>("nodata_tolerance",1e-12))
 {
@@ -101,7 +102,7 @@ gdal_datasource::gdal_datasource(parameters const& params)
         dataset_name_ = *file;
     }
 
-    shared_dataset_ = *params.get<mapnik::boolean>("shared", false);
+    shared_dataset_ = *params.get<mapnik::boolean_type>("shared", false);
     band_ = *params.get<mapnik::value_integer>("band", -1);
 
     GDALDataset *dataset = open_dataset();

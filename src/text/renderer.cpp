@@ -31,13 +31,27 @@
 namespace mapnik
 {
 
-text_renderer::text_renderer (halo_rasterizer_e rasterizer, composite_mode_e comp_op, double scale_factor, stroker_ptr stroker)
+text_renderer::text_renderer (halo_rasterizer_e rasterizer, composite_mode_e comp_op,
+                              composite_mode_e halo_comp_op, double scale_factor, stroker_ptr stroker)
     : rasterizer_(rasterizer),
       comp_op_(comp_op),
+      halo_comp_op_(halo_comp_op),
       scale_factor_(scale_factor),
       glyphs_(),
-      stroker_(stroker)
+      stroker_(stroker),
+      transform_(),
+      halo_transform_()
 {}
+
+void text_renderer::set_transform(agg::trans_affine const& transform)
+{
+    transform_ = transform;
+}
+
+void text_renderer::set_halo_transform(agg::trans_affine const& halo_transform)
+{
+    halo_transform_ = halo_transform;
+}
 
 void text_renderer::prepare_glyphs(glyph_positions const& positions)
 {
@@ -69,7 +83,7 @@ void text_renderer::prepare_glyphs(glyph_positions const& positions)
         error = FT_Get_Glyph(face->glyph, &image);
         if (error) continue;
 
-        glyphs_.emplace_back(image, glyph.format);
+        glyphs_.emplace_back(image, glyph.format.get());
     }
 }
 
@@ -97,9 +111,10 @@ template <typename T>
 agg_text_renderer<T>::agg_text_renderer (pixmap_type & pixmap,
                                          halo_rasterizer_e rasterizer,
                                          composite_mode_e comp_op,
+                                         composite_mode_e halo_comp_op,
                                          double scale_factor,
                                          stroker_ptr stroker)
-    : text_renderer(rasterizer, comp_op, scale_factor, stroker), pixmap_(pixmap)
+    : text_renderer(rasterizer, comp_op, halo_comp_op, scale_factor, stroker), pixmap_(pixmap)
 {}
 
 template <typename T>
@@ -109,15 +124,35 @@ void agg_text_renderer<T>::render(glyph_positions const& pos)
     prepare_glyphs(pos);
     FT_Error  error;
     FT_Vector start;
+    FT_Vector start_halo;
     int height = pixmap_.height();
     pixel_position const& base_point = pos.get_base_point();
 
     start.x =  static_cast<FT_Pos>(base_point.x * (1 << 6));
     start.y =  static_cast<FT_Pos>((height - base_point.y) * (1 << 6));
-
+    start_halo = start;
+    start.x += transform_.tx * 64;
+    start.y += transform_.ty * 64;
+    start_halo.x += halo_transform_.tx * 64;
+    start_halo.y += halo_transform_.ty * 64;
     //render halo
     double halo_radius = 0;
-    char_properties_ptr format;
+
+
+    FT_Matrix halo_matrix;
+    halo_matrix.xx = halo_transform_.sx  * 0x10000L;
+    halo_matrix.xy = halo_transform_.shx * 0x10000L;
+    halo_matrix.yy = halo_transform_.sy  * 0x10000L;
+    halo_matrix.yx = halo_transform_.shy * 0x10000L;
+
+    FT_Matrix matrix;
+    matrix.xx = transform_.sx  * 0x10000L;
+    matrix.xy = transform_.shx * 0x10000L;
+    matrix.yy = transform_.sy  * 0x10000L;
+    matrix.yx = transform_.shy * 0x10000L;
+
+    detail::evaluated_format_properties default_props;
+    detail::evaluated_format_properties const* format = &default_props;
     for (auto const& glyph : glyphs_)
     {
         if (glyph.properties)
@@ -132,7 +167,7 @@ void agg_text_renderer<T>::render(glyph_positions const& pos)
         error = FT_Glyph_Copy(glyph.image, &g);
         if (!error)
         {
-            FT_Glyph_Transform(g,0,&start);
+            FT_Glyph_Transform(g, &halo_matrix, &start_halo);
             if (rasterizer_ == HALO_RASTERIZER_FULL)
             {
                 stroker_->init(halo_radius);
@@ -146,8 +181,8 @@ void agg_text_renderer<T>::render(glyph_positions const& pos)
                                      format->halo_fill.rgba(),
                                      bit->left,
                                      height - bit->top,
-                                     format->text_opacity,
-                                     comp_op_);
+                                     format->halo_opacity,
+                                     halo_comp_op_);
                 }
             }
             else
@@ -161,8 +196,8 @@ void agg_text_renderer<T>::render(glyph_positions const& pos)
                                 bit->left,
                                 height - bit->top,
                                 halo_radius,
-                                format->text_opacity,
-                                comp_op_);
+                                format->halo_opacity,
+                                halo_comp_op_);
                 }
             }
         }
@@ -170,14 +205,15 @@ void agg_text_renderer<T>::render(glyph_positions const& pos)
     }
 
     // render actual text
+    format = &default_props;
     for (auto & glyph : glyphs_)
     {
         if (glyph.properties)
         {
             format = glyph.properties;
         }
-        FT_Glyph_Transform(glyph.image, 0, &start);
-        error = FT_Glyph_To_Bitmap(&glyph.image ,FT_RENDER_MODE_NORMAL,0,1);
+        FT_Glyph_Transform(glyph.image, &matrix, &start);
+        error = FT_Glyph_To_Bitmap(&glyph.image ,FT_RENDER_MODE_NORMAL, 0, 1);
         if (!error)
         {
             FT_BitmapGlyph bit = reinterpret_cast<FT_BitmapGlyph>(glyph.image);
@@ -312,12 +348,11 @@ void grid_text_renderer<T>::render_halo_id(
 template <typename T>
 grid_text_renderer<T>::grid_text_renderer(pixmap_type &pixmap,
                                           composite_mode_e comp_op,
-                                          double scale_factor) :
-    text_renderer(HALO_RASTERIZER_FAST, comp_op, scale_factor), pixmap_(pixmap)
-{
-}
-
+                                          double scale_factor)
+    : text_renderer(HALO_RASTERIZER_FAST, comp_op, src_over, scale_factor),
+      pixmap_(pixmap) {}
 
 template class agg_text_renderer<image_32>;
 template class grid_text_renderer<grid>;
-}
+
+} // namespace mapnik

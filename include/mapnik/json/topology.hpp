@@ -25,15 +25,17 @@
 
 #include <vector>
 #include <list>
-#include <boost/variant.hpp>
+
+#include <mapnik/feature.hpp>
+#include <mapnik/util/variant.hpp>
+
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/fusion/adapted/std_tuple.hpp>
 #include <boost/optional.hpp>
-#include <mapnik/feature.hpp>
 
 namespace mapnik { namespace topojson {
 
-typedef int index_type;
+using index_type = int;
 
 struct coordinate
 {
@@ -41,9 +43,9 @@ struct coordinate
     double y;
 };
 
-typedef boost::variant<value_null,bool,value_integer,value_double,std::string> value;
-typedef std::tuple<std::string, value > property;
-typedef std::vector<property> properties;
+using value = mapnik::util::variant<value_null,bool,value_integer,value_double,std::string>;
+using property = std::tuple<std::string, value >;
+using properties = std::vector<property>;
 
 struct point
 {
@@ -83,15 +85,15 @@ struct multi_polygon
 
 struct invalid {};
 
-typedef boost::variant<invalid,
-                       point,
-                       linestring,
-                       polygon,
-                       multi_point,
-                       multi_linestring,
-                       multi_polygon> geometry;
+using geometry =  util::variant<invalid,
+                                point,
+                                linestring,
+                                polygon,
+                                multi_point,
+                                multi_linestring,
+                                multi_polygon>;
 
-typedef std::tuple<double,double> pair_type;
+using pair_type = std::tuple<double,double>;
 
 struct arc
 {

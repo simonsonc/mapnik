@@ -46,8 +46,8 @@ using mapnik::image_reader;
 DATASOURCE_PLUGIN(raster_datasource)
 
 raster_datasource::raster_datasource(parameters const& params)
-: datasource(params),
-    desc_(*params.get<std::string>("type"), "utf-8"),
+  : datasource(params),
+    desc_(raster_datasource::name(), "utf-8"),
     extent_initialized_(false)
 {
     MAPNIK_LOG_DEBUG(raster) << "raster_datasource: Initializing...";
@@ -61,7 +61,7 @@ raster_datasource::raster_datasource(parameters const& params)
     else
         filename_ = *file;
 
-    multi_tiles_ = *params.get<mapnik::boolean>("multi", false);
+    multi_tiles_ = *params.get<mapnik::boolean_type>("multi", false);
     tile_size_ = *params.get<mapnik::value_integer>("tile_size", 256);
     tile_stride_ = *params.get<mapnik::value_integer>("tile_stride", 1);
 

@@ -22,39 +22,28 @@
 
 #include <mapnik/parse_path.hpp>
 #include <mapnik/path_expression_grammar.hpp>
-
+#include <mapnik/path_expression_grammar_impl.hpp>
 #include <mapnik/config.hpp>
 #include <mapnik/attribute.hpp>
 #include <mapnik/feature.hpp>
 #include <mapnik/value.hpp>
 
-// boost
-#include <boost/variant.hpp>
-
-
 // stl
 #include <stdexcept>
-
 
 namespace mapnik {
 
 path_expression_ptr parse_path(std::string const& str)
 {
-    path_expression_grammar<std::string::const_iterator> g;
-    return parse_path(str,g);
-}
-
-path_expression_ptr parse_path(std::string const& str,
-                               path_expression_grammar<std::string::const_iterator> const& g)
-{
-    path_expression path;
+    static const path_expression_grammar<std::string::const_iterator> g;
+    auto path = std::make_shared<path_expression>();
     boost::spirit::standard_wide::space_type space;
     std::string::const_iterator itr = str.begin();
     std::string::const_iterator end = str.end();
-    bool r = qi::phrase_parse(itr, end, g, space, path);
-    if (r  && itr == end)
+    bool r = qi::phrase_parse(itr, end, g, space, *path);
+    if (r && itr == end)
     {
-        return std::make_shared<path_expression>(path); //path;
+        return path;
     }
     else
     {
@@ -62,8 +51,9 @@ path_expression_ptr parse_path(std::string const& str,
     }
 }
 
-namespace path_processor_detail {
-    struct path_visitor_ : boost::static_visitor<void>
+namespace path_processor_detail
+{
+    struct path_visitor_ : util::static_visitor<void>
     {
         path_visitor_ (std::string & filename, feature_impl const& f)
             : filename_(filename),
@@ -85,7 +75,7 @@ namespace path_processor_detail {
         feature_impl const& feature_;
     };
 
-    struct to_string_ : boost::static_visitor<void>
+    struct to_string_ : util::static_visitor<void>
     {
         to_string_ (std::string & str)
             : str_(str) {}
@@ -105,14 +95,13 @@ namespace path_processor_detail {
         std::string & str_;
     };
 
-    struct collect_ : boost::static_visitor<void>
+    struct collect_ : util::static_visitor<void>
     {
         collect_ (std::set<std::string> & cont)
             : cont_(cont) {}
 
-        void operator() (std::string const& token) const
+        void operator() (std::string const&) const
         {
-            boost::ignore_unused_variable_warning(token);
         }
 
         void operator() (attribute const& attr) const
@@ -129,7 +118,9 @@ std::string path_processor::evaluate(path_expression const& path,feature_impl co
     std::string out;
     path_processor_detail::path_visitor_ eval(out,f);
     for ( mapnik::path_component const& token : path)
-        boost::apply_visitor(eval,token);
+    {
+        util::apply_visitor(std::ref(eval),token);
+    }
     return out;
 }
 
@@ -138,7 +129,9 @@ std::string path_processor::to_string(path_expression const& path)
     std::string str;
     path_processor_detail::to_string_ visitor(str);
     for ( mapnik::path_component const& token : path)
-        boost::apply_visitor(visitor,token);
+    {
+        util::apply_visitor(std::ref(visitor),token);
+    }
     return str;
 }
 
@@ -146,7 +139,9 @@ void path_processor::collect_attributes(path_expression const& path, std::set<st
 {
     path_processor_detail::collect_ visitor(names);
     for ( mapnik::path_component const& token : path)
-        boost::apply_visitor(visitor,token);
+    {
+        util::apply_visitor(std::ref(visitor),token);
+    }
 }
 
 

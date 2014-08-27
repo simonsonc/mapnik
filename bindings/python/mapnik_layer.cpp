@@ -20,6 +20,7 @@
  *
  *****************************************************************************/
 
+#include <mapnik/config.hpp>
 #include "boost_std_shared_shim.hpp"
 
 // boost
@@ -375,6 +376,7 @@ void export_layer()
                       ">>> lyr.styles[0]\n"
                       "'My Style'\n"
             )
-
+        // comparison
+        .def(self == self)
         ;
 }

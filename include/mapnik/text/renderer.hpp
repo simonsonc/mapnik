@@ -23,14 +23,13 @@
 #ifndef MAPNIK_TEXT_RENDERER_HPP
 #define MAPNIK_TEXT_RENDERER_HPP
 
-//mapnik
+// mapnik
 #include <mapnik/text/placement_finder.hpp>
 #include <mapnik/image_compositing.hpp>
-#include <mapnik/text_symbolizer.hpp>
+#include <mapnik/symbolizer.hpp>
 #include <mapnik/noncopyable.hpp>
-
-//TODO: Find a better place for halo_rasterizer_e!
-//TODO: Halo rasterizer selection should go to text_properties because it might make sense to use a different rasterizer for different fonts
+// agg
+#include <agg_trans_affine.h>
 
 // freetype2
 extern "C"
@@ -46,16 +45,17 @@ namespace mapnik
 struct glyph_t
 {
     FT_Glyph image;
-    char_properties_ptr properties;
+    detail::evaluated_format_properties const* properties;
 
-    glyph_t(FT_Glyph image_, char_properties_ptr properties_)
+    glyph_t(FT_Glyph image_, detail::evaluated_format_properties const* properties_)
         : image(image_), properties(properties_) {}
 
     glyph_t( glyph_t && other) noexcept
-        : image(other.image),
-          properties(std::move(other.properties))
+    : image(other.image),
+        properties(other.properties)
     {
         other.image = nullptr;
+        other.properties = nullptr;
     }
 
     glyph_t(glyph_t const& ) = delete;
@@ -70,27 +70,34 @@ class text_renderer : private mapnik::noncopyable
 public:
     text_renderer (halo_rasterizer_e rasterizer,
                    composite_mode_e comp_op = src_over,
+                   composite_mode_e halo_comp_op = src_over,
                    double scale_factor=1.0,
                    stroker_ptr stroker=stroker_ptr());
+    void set_transform(agg::trans_affine const& transform);
+    void set_halo_transform(agg::trans_affine const& halo_transform);
 protected:
-    typedef std::vector<glyph_t> glyph_vector;
+    using glyph_vector = std::vector<glyph_t>;
     void prepare_glyphs(glyph_positions const& positions);
     halo_rasterizer_e rasterizer_;
     composite_mode_e comp_op_;
+    composite_mode_e halo_comp_op_;
     double scale_factor_;
     glyph_vector glyphs_;
     stroker_ptr stroker_;
+    agg::trans_affine transform_;
+    agg::trans_affine halo_transform_;
 };
 
 template <typename T>
 class agg_text_renderer : public text_renderer
 {
 public:
-    typedef T pixmap_type;
+    using pixmap_type = T;
     agg_text_renderer (pixmap_type & pixmap, halo_rasterizer_e rasterizer,
                        composite_mode_e comp_op = src_over,
-                       double scale_factor=1.0,
-                       stroker_ptr stroker=stroker_ptr());
+                       composite_mode_e halo_comp_op = src_over,
+                       double scale_factor = 1.0,
+                       stroker_ptr stroker = stroker_ptr());
     void render(glyph_positions const& positions);
 private:
     pixmap_type & pixmap_;
@@ -103,9 +110,10 @@ template <typename T>
 class grid_text_renderer : public text_renderer
 {
 public:
-    typedef T pixmap_type;
-    grid_text_renderer (pixmap_type & pixmap, composite_mode_e comp_op = src_over,
-                        double scale_factor=1.0);
+    using pixmap_type = T;
+    grid_text_renderer (pixmap_type & pixmap,
+                        composite_mode_e comp_op = src_over,
+                        double scale_factor = 1.0);
     void render(glyph_positions const& positions, value_integer feature_id);
 private:
     pixmap_type & pixmap_;

@@ -29,16 +29,21 @@
 
 // boost
 #include <boost/spirit/include/support_container.hpp>
+#include <boost/concept_check.hpp>
 
 namespace boost { namespace spirit { namespace traits {
 
 template <>
 struct is_container<mapnik::geometry_type const> : mpl::true_ {} ;
 
+// make gcc and darwin toolsets happy.
+template <>
+struct is_container<mapnik::geometry_container const> : mpl::false_ {} ;
+
 template <>
 struct container_iterator<mapnik::geometry_type const>
 {
-    typedef mapnik::util::path_iterator<mapnik::geometry_type> type;
+    using type = mapnik::util::path_iterator<mapnik::geometry_type>;
 };
 
 template <>
@@ -55,8 +60,9 @@ template <>
 struct end_container<mapnik::geometry_type const>
 {
     static mapnik::util::path_iterator<mapnik::geometry_type>
-    call (mapnik::geometry_type const& /*g*/)
+    call (mapnik::geometry_type const& g)
     {
+        boost::ignore_unused_variable_warning(g);
         return mapnik::util::path_iterator<mapnik::geometry_type>();
     }
 };

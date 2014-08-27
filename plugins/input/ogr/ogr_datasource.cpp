@@ -61,7 +61,7 @@ ogr_datasource::ogr_datasource(parameters const& params)
     : datasource(params),
       extent_(),
       type_(datasource::Vector),
-      desc_(*params.get<std::string>("type"), *params.get<std::string>("encoding", "utf-8")),
+      desc_(ogr_datasource::name(), *params.get<std::string>("encoding", "utf-8")),
       indexed_(false)
 {
     init(params);
@@ -71,7 +71,11 @@ ogr_datasource::~ogr_datasource()
 {
     // free layer before destroying the datasource
     layer_.free_layer();
+#if GDAL_VERSION_MAJOR >= 2
+    GDALClose(( GDALDatasetH) dataset_);
+#else
     OGRDataSource::DestroyDataSource (dataset_);
+#endif
 }
 
 void ogr_datasource::init(mapnik::parameters const& params)
@@ -81,10 +85,12 @@ void ogr_datasource::init(mapnik::parameters const& params)
 #endif
 
     // initialize ogr formats
+    // NOTE: in GDAL >= 2.0 this is the same as GDALAllRegister()
     OGRRegisterAll();
 
     boost::optional<std::string> file = params.get<std::string>("file");
     boost::optional<std::string> string = params.get<std::string>("string");
+    if (!string) string  = params.get<std::string>("inline");
     if (! file && ! string)
     {
         throw datasource_exception("missing <file> or <string> parameter");
@@ -111,17 +117,26 @@ void ogr_datasource::init(mapnik::parameters const& params)
 
     if (! driver.empty())
     {
+#if GDAL_VERSION_MAJOR >= 2
+        unsigned int nOpenFlags = GDAL_OF_READONLY | GDAL_OF_VECTOR;
+        const char* papszAllowedDrivers[] = { driver.c_str(), nullptr };
+        dataset_ = reinterpret_cast<gdal_dataset_type>(GDALOpenEx(dataset_name_.c_str(),nOpenFlags,papszAllowedDrivers, nullptr, nullptr));
+#else
         OGRSFDriver * ogr_driver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(driver.c_str());
         if (ogr_driver && ogr_driver != nullptr)
         {
-            dataset_ = ogr_driver->Open((dataset_name_).c_str(), FALSE);
+            dataset_ = ogr_driver->Open((dataset_name_).c_str(), false);
         }
-
+#endif
     }
     else
     {
         // open ogr driver
-        dataset_ = OGRSFDriverRegistrar::Open((dataset_name_).c_str(), FALSE);
+#if GDAL_VERSION_MAJOR >= 2
+        dataset_ = reinterpret_cast<gdal_dataset_type>(OGROpen(dataset_name_.c_str(), false, nullptr));
+#else
+        dataset_ = OGRSFDriverRegistrar::Open(dataset_name_.c_str(), false);
+#endif
     }
 
     if (! dataset_)
@@ -165,8 +180,8 @@ void ogr_datasource::init(mapnik::parameters const& params)
         int num_layers = dataset_->GetLayerCount();
         if (*layer_by_index >= num_layers)
         {
-            std::ostringstream s("OGR Plugin: only ");
-            s << num_layers << " layer(s) exist, cannot find layer by index '" << *layer_by_index << "'";
+            std::ostringstream s;
+            s << "OGR Plugin: only " << num_layers << " layer(s) exist, cannot find layer by index '" << *layer_by_index << "'";
             throw datasource_exception(s.str());
         }
 
@@ -214,7 +229,8 @@ void ogr_datasource::init(mapnik::parameters const& params)
 
     if (! layer_.is_valid())
     {
-        std::ostringstream s("OGR Plugin: ");
+        std::ostringstream s;
+        s << "OGR Plugin: ";
 
         if (layer_by_name)
         {
@@ -238,9 +254,30 @@ void ogr_datasource::init(mapnik::parameters const& params)
     OGRLayer* layer = layer_.layer();
 
     // initialize envelope
-    OGREnvelope envelope;
-    layer->GetExtent(&envelope);
-    extent_.init(envelope.MinX, envelope.MinY, envelope.MaxX, envelope.MaxY);
+    boost::optional<std::string> ext = params.get<std::string>("extent");
+    if (ext && !ext->empty())
+    {
+        extent_.from_string(*ext);
+    }
+    else
+    {
+        OGREnvelope envelope;
+        OGRErr e = layer->GetExtent(&envelope);
+        if (e == OGRERR_FAILURE)
+        {
+            if (layer->GetFeatureCount() == 0)
+            {
+                MAPNIK_LOG_ERROR(ogr) << "could not determine extent, layer '" << layer->GetLayerDefn()->GetName() << "' appears to have no features";
+            }
+            else
+            {
+                std::ostringstream s;
+                s << "OGR Plugin: Cannot determine extent for layer '" << layer->GetLayerDefn()->GetName() << "'. Please provide a manual extent string (minx,miny,maxx,maxy).";
+                throw datasource_exception(s.str());
+            }
+        }
+        extent_.init(envelope.MinX, envelope.MinY, envelope.MaxX, envelope.MaxY);
+    }
 
     // scan for index file
     // TODO - layer names don't match dataset name, so this will break for
@@ -452,8 +489,8 @@ void validate_attribute_names(query const& q, std::vector<attribute_descriptor> 
 
         if (! found_name)
         {
-            std::ostringstream s("OGR Plugin: no attribute '");
-            s << *pos << "'. Valid attributes are: ";
+            std::ostringstream s;
+            s << "OGR Plugin: no attribute named '" << *pos << "'. Valid attributes are: ";
             std::vector<attribute_descriptor>::const_iterator e_itr = names.begin();
             std::vector<attribute_descriptor>::const_iterator e_end = names.end();
             for ( ;e_itr!=e_end;++e_itr)

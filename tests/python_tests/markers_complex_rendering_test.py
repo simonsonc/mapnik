@@ -18,7 +18,7 @@ if 'csv' in mapnik.DatasourceCache.plugin_names():
         mapnik.render(m,im)
         actual = '/tmp/mapnik-marker-ellipse-render1.png'
         expected = 'images/support/mapnik-marker-ellipse-render1.png'
-        im.save(actual)
+        im.save(actual,'png32')
         expected_im = mapnik.Image.open(expected)
         eq_(im.tostring('png32'),expected_im.tostring('png32'), 'failed comparing actual (%s) and expected (%s)' % (actual,'tests/python_tests/'+ expected))
 
@@ -31,10 +31,10 @@ if 'csv' in mapnik.DatasourceCache.plugin_names():
         mapnik.render(m,im)
         actual = '/tmp/mapnik-marker-ellipse-render2.png'
         expected = 'images/support/mapnik-marker-ellipse-render2.png'
-        im.save(actual)
+        im.save(actual,'png32')
         expected_im = mapnik.Image.open(expected)
         eq_(im.tostring('png32'),expected_im.tostring('png32'), 'failed comparing actual (%s) and expected (%s)' % (actual,'tests/python_tests/'+ expected))
 
 if __name__ == "__main__":
     setup()
-    run_all(eval(x) for x in dir() if x.startswith("test_"))
+    exit(run_all(eval(x) for x in dir() if x.startswith("test_")))

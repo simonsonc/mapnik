@@ -22,15 +22,18 @@
 
 // mapnik
 #include <mapnik/debug.hpp>
+#include <mapnik/datasource.hpp>
 #include <mapnik/datasource_cache.hpp>
 #include <mapnik/config_error.hpp>
 #include <mapnik/params.hpp>
 #include <mapnik/plugin.hpp>
 #include <mapnik/util/fs.hpp>
+#include <mapnik/utils.hpp>
 
 // boost
 #include <boost/filesystem/operations.hpp>
-#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 // stl
 #include <algorithm>
@@ -38,6 +41,8 @@
 #include <stdexcept>
 
 namespace mapnik {
+
+template class singleton<datasource_cache, CreateStatic>;
 
 extern datasource_ptr create_static_datasource(parameters const& params);
 extern std::vector<std::string> get_static_datasource_names();
@@ -77,24 +82,27 @@ datasource_ptr datasource_cache::create(parameters const& params)
     }
 #endif
 
-#ifdef MAPNIK_THREADSAFE
-    mapnik::scoped_lock lock(mutex_);
-#endif
-
-    std::map<std::string,std::shared_ptr<PluginInfo> >::iterator itr=plugins_.find(*type);
-    if (itr == plugins_.end())
+    std::map<std::string,std::shared_ptr<PluginInfo> >::iterator itr;
+    // add scope to ensure lock is released asap
     {
-        std::string s("Could not create datasource for type: '");
-        s += *type + "'";
-        if (plugin_directories_.empty())
+#ifdef MAPNIK_THREADSAFE
+        mapnik::scoped_lock lock(mutex_);
+#endif
+        itr=plugins_.find(*type);
+        if (itr == plugins_.end())
         {
-            s += " (no datasource plugin directories have been successfully registered)";
+            std::string s("Could not create datasource for type: '");
+            s += *type + "'";
+            if (plugin_directories_.empty())
+            {
+                s += " (no datasource plugin directories have been successfully registered)";
+            }
+            else
+            {
+                s += " (searched for datasource plugins in '" + plugin_directories() + "')";
+            }
+            throw config_error(s);
         }
-        else
-        {
-            s += " (searched for datasource plugins in '" + plugin_directories() + "')";
-        }
-        throw config_error(s);
     }
 
     if (! itr->second->valid())
@@ -107,7 +115,7 @@ datasource_ptr datasource_cache::create(parameters const& params)
 #ifdef __GNUC__
     __extension__
 #endif
-        create_ds* create_datasource = reinterpret_cast<create_ds*>(itr->second->get_symbol("create"));
+        create_ds create_datasource = reinterpret_cast<create_ds>(itr->second->get_symbol("create"));
 
     if (! create_datasource)
     {
@@ -169,7 +177,12 @@ void datasource_cache::register_datasources(std::string const& str)
     if (mapnik::util::exists(str) && mapnik::util::is_directory(str))
     {
         boost::filesystem::directory_iterator end_itr;
+#ifdef _WINDOWS
+        std::wstring wide_dir(mapnik::utf8_to_utf16(str));
+        for (boost::filesystem::directory_iterator itr(wide_dir); itr != end_itr; ++itr)
+#else
         for (boost::filesystem::directory_iterator itr(str); itr != end_itr; ++itr )
+#endif
         {
 
 #if (BOOST_FILESYSTEM_VERSION == 3)
@@ -213,7 +226,7 @@ bool datasource_cache::register_datasource(std::string const& filename)
             }
             else
             {
-                if (plugins_.insert(std::make_pair(plugin->name(),plugin)).second)
+                if (plugins_.emplace(plugin->name(),plugin).second)
                 {
                     MAPNIK_LOG_DEBUG(datasource_cache)
                             << "datasource_cache: Registered="

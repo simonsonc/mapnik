@@ -26,19 +26,18 @@
 // mapnik
 #include <mapnik/config.hpp>
 #include <mapnik/utils.hpp>
-#include <mapnik/params.hpp>
-#include <mapnik/datasource.hpp>
 #include <mapnik/noncopyable.hpp>
-
-// boost
-#include <memory>
 
 // stl
 #include <map>
 #include <set>
+#include <vector>
+#include <memory>
 
 namespace mapnik {
 
+class datasource;
+class parameters;
 class PluginInfo;
 
 class MAPNIK_DECL datasource_cache
@@ -59,6 +58,9 @@ private:
     bool registered_;
     std::set<std::string> plugin_directories_;
 };
+
+extern template class MAPNIK_DECL singleton<datasource_cache, CreateStatic>;
+
 }
 
 #endif // MAPNIK_DATASOURCE_CACHE_HPP

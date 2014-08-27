@@ -36,9 +36,6 @@
 // boost
 
 
-// stl
-#include <cassert>
-
 extern "C"
 {
 #include <png.h>
@@ -542,11 +539,9 @@ void save_as_png8_oct(T1 & file,
             std::vector<rgb> pal;
             trees[j].setOffset( static_cast<unsigned>(palette.size()));
             trees[j].create_palette(pal);
-            assert(pal.size() <= opts.colors);
             leftovers = cols[j] - static_cast<unsigned>(pal.size());
             cols[j] = static_cast<unsigned>(pal.size());
             palette.insert(palette.begin(), pal.begin(), pal.end());
-            assert(palette.size() <= 256);
         }
     }
 
@@ -659,41 +654,45 @@ void save_as_png8_hex(T1 & file,
 {
     unsigned width = image.width();
     unsigned height = image.height();
-
-    // structure for color quantization
-    hextree<mapnik::rgba> tree(opts.colors);
-    if (opts.trans_mode >= 0)
+    if (width + height > 3) // at least 3 pixels (hextree implementation requirement)
     {
-        tree.setTransMode(opts.trans_mode);
-    }
-    if (opts.gamma > 0)
-    {
-        tree.setGamma(opts.gamma);
-    }
-
-    for (unsigned y = 0; y < height; ++y)
-    {
-        typename T2::pixel_type const * row = image.getRow(y);
-        for (unsigned x = 0; x < width; ++x)
+        // structure for color quantization
+        hextree<mapnik::rgba> tree(opts.colors);
+        if (opts.trans_mode >= 0)
         {
-            unsigned val = row[x];
-            tree.insert(mapnik::rgba(U2RED(val), U2GREEN(val), U2BLUE(val), U2ALPHA(val)));
+            tree.setTransMode(opts.trans_mode);
         }
-    }
+        if (opts.gamma > 0)
+        {
+            tree.setGamma(opts.gamma);
+        }
 
-    //transparency values per palette index
-    std::vector<mapnik::rgba> pal;
-    tree.create_palette(pal);
-    assert(int(pal.size()) <= opts.colors);
-    std::vector<mapnik::rgb> palette;
-    std::vector<unsigned> alphaTable;
-    for(unsigned i=0; i<pal.size(); i++)
+        for (unsigned y = 0; y < height; ++y)
+        {
+            typename T2::pixel_type const * row = image.getRow(y);
+            for (unsigned x = 0; x < width; ++x)
+            {
+                unsigned val = row[x];
+                tree.insert(mapnik::rgba(U2RED(val), U2GREEN(val), U2BLUE(val), U2ALPHA(val)));
+            }
+        }
+
+        //transparency values per palette index
+        std::vector<mapnik::rgba> pal;
+        tree.create_palette(pal);
+        std::vector<mapnik::rgb> palette;
+        std::vector<unsigned> alphaTable;
+        for (unsigned i=0; i<pal.size(); ++i)
+        {
+            palette.push_back(rgb(pal[i].r, pal[i].g, pal[i].b));
+            alphaTable.push_back(pal[i].a);
+        }
+        save_as_png8<T1, T2, hextree<mapnik::rgba> >(file, image, tree, palette, alphaTable, opts);
+    }
+    else
     {
-        palette.push_back(rgb(pal[i].r, pal[i].g, pal[i].b));
-        alphaTable.push_back(pal[i].a);
+        throw std::runtime_error("Can't quantize images with less than 3 pixels");
     }
-
-    save_as_png8<T1, T2, hextree<mapnik::rgba> >(file, image, tree, palette, alphaTable, opts);
 }
 
 template <typename T1, typename T2>

@@ -25,18 +25,10 @@
 
 // mapnik
 #include <mapnik/config.hpp>
-#ifdef MAPNIK_LOG
-#include <mapnik/debug.hpp>
-#endif
 #include <mapnik/value.hpp>
 #include <mapnik/transform_expression.hpp>
 #include <mapnik/expression_evaluator.hpp>
-
-// boost
-
-#include <boost/variant/static_visitor.hpp>
-#include <boost/variant/apply_visitor.hpp>
-#include <boost/range/adaptor/reversed.hpp>
+#include <mapnik/util/variant.hpp>
 // agg
 #include <agg_trans_affine.h>
 
@@ -46,77 +38,78 @@ class feature_impl;
 
 template <typename Container> struct expression_attributes;
 
-template <typename T>
+template <typename T, typename T1>
 struct transform_processor
 {
-    typedef T feature_type;
-    typedef agg::trans_affine transform_type;
+    using feature_type = T;
+    using variable_type = T1;
+    using transform_type = agg::trans_affine;
 
     template <typename Container>
-    struct attribute_collector : boost::static_visitor<void>
+    struct attribute_collector : util::static_visitor<void>
     {
         expression_attributes<Container> collect_;
 
         attribute_collector(Container& names)
             : collect_(names) {}
 
-        void operator() (identity_node const& node) const
+        void operator() (identity_node const&) const
         {
-            boost::ignore_unused_variable_warning(node);
         }
 
         void operator() (matrix_node const& node) const
         {
-            boost::apply_visitor(collect_, node.a_);
-            boost::apply_visitor(collect_, node.b_);
-            boost::apply_visitor(collect_, node.c_);
-            boost::apply_visitor(collect_, node.d_);
-            boost::apply_visitor(collect_, node.e_);
-            boost::apply_visitor(collect_, node.f_);
+            util::apply_visitor(collect_, node.a_);
+            util::apply_visitor(collect_, node.b_);
+            util::apply_visitor(collect_, node.c_);
+            util::apply_visitor(collect_, node.d_);
+            util::apply_visitor(collect_, node.e_);
+            util::apply_visitor(collect_, node.f_);
         }
 
         void operator() (translate_node const& node) const
         {
-            boost::apply_visitor(collect_, node.tx_);
-            boost::apply_visitor(collect_, node.ty_);
+            util::apply_visitor(collect_, node.tx_);
+            util::apply_visitor(collect_, node.ty_);
         }
 
         void operator() (scale_node const& node) const
         {
-            boost::apply_visitor(collect_, node.sx_);
-            boost::apply_visitor(collect_, node.sy_);
+            util::apply_visitor(collect_, node.sx_);
+            util::apply_visitor(collect_, node.sy_);
         }
 
         void operator() (rotate_node const& node) const
         {
-            boost::apply_visitor(collect_, node.angle_);
-            boost::apply_visitor(collect_, node.cx_);
-            boost::apply_visitor(collect_, node.cy_);
+            util::apply_visitor(collect_, node.angle_);
+            util::apply_visitor(collect_, node.cx_);
+            util::apply_visitor(collect_, node.cy_);
         }
 
         void operator() (skewX_node const& node) const
         {
-            boost::apply_visitor(collect_, node.angle_);
+            util::apply_visitor(collect_, node.angle_);
         }
 
         void operator() (skewY_node const& node) const
         {
-            boost::apply_visitor(collect_, node.angle_);
+            util::apply_visitor(collect_, node.angle_);
         }
     };
 
-    struct node_evaluator : boost::static_visitor<void>
+    struct node_evaluator : util::static_visitor<void>
     {
         node_evaluator(transform_type& tr,
                        feature_type const& feat,
+                       variable_type const& v,
                        double scale_factor)
             : transform_(tr),
               feature_(feat),
+              vars_(v),
               scale_factor_(scale_factor) {}
 
-        void operator() (identity_node const& node)
+        void operator() (identity_node const&)
         {
-            boost::ignore_unused_variable_warning(node);
         }
 
         void operator() (matrix_node const& node)
@@ -175,17 +168,18 @@ struct transform_processor
 
         double eval(expr_node const& x) const
         {
-            mapnik::evaluate<feature_type, value_type> e(feature_);
-            return boost::apply_visitor(e, x).to_double();
+            mapnik::evaluate<feature_type, value_type, variable_type> e(feature_,vars_);
+            return util::apply_visitor(e, x).to_double();
         }
 
         double eval(expr_node const& x, double def) const
         {
-            return is_null(x) ? def : eval(x);
+            return detail::is_null_node(x) ? def : eval(x);
         }
 
         transform_type& transform_;
         feature_type const& feature_;
+        variable_type const& vars_;
         double scale_factor_;
     };
 
@@ -197,31 +191,23 @@ struct transform_processor
 
         for (transform_node const& node : list)
         {
-            boost::apply_visitor(collect, *node);
+            util::apply_visitor(collect, *node);
         }
     }
 
-    static void evaluate(transform_type& tr, feature_type const& feat,
-                         transform_list const& list, double scale_factor)
+    static void evaluate(transform_type& tr,
+                         feature_type const& feat,
+                         variable_type const& vars,
+                         transform_list const& list,
+                         double scale_factor)
     {
-        node_evaluator eval(tr, feat, scale_factor);
+        node_evaluator eval(tr, feat, vars, scale_factor);
 
-        #ifdef MAPNIK_LOG
-        MAPNIK_LOG_DEBUG(transform) << "transform: begin with " << to_string(matrix_node(tr));
-        #endif
-
-        for (transform_node const& node : boost::adaptors::reverse(list))
+        transform_list::const_reverse_iterator rit;
+        for (rit = list.rbegin(); rit!= list.rend(); ++rit)
         {
-            boost::apply_visitor(eval, *node);
-            #ifdef MAPNIK_LOG
-            MAPNIK_LOG_DEBUG(transform) << "transform: apply " << to_string(*node);
-            MAPNIK_LOG_DEBUG(transform) << "transform: result " << to_string(matrix_node(tr));
-            #endif
+            util::apply_visitor(eval, *(*rit));
         }
-
-        #ifdef MAPNIK_LOG
-        MAPNIK_LOG_DEBUG(transform) << "transform: end";
-        #endif
     }
 
     static std::string to_string(transform_node const& node)
@@ -235,7 +221,7 @@ struct transform_processor
     }
 };
 
-typedef mapnik::transform_processor<feature_impl> transform_processor_type;
+using transform_processor_type = mapnik::transform_processor<feature_impl,attributes>;
 
 } // namespace mapnik
 

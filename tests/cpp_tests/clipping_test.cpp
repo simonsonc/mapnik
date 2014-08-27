@@ -1,4 +1,3 @@
-
 // mapnik
 #include <mapnik/geometry.hpp>
 #include <mapnik/util/conversions.hpp>
@@ -11,6 +10,7 @@
 // stl
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <vector>
 #include <algorithm>
@@ -44,7 +44,7 @@ std::string dump_path(T & path)
 std::string clip_line(mapnik::box2d<double> const& bbox,
                       mapnik::geometry_type & geom)
 {
-    typedef agg::conv_clip_polyline<mapnik::geometry_type> line_clipper;
+    using line_clipper = agg::conv_clip_polyline<mapnik::geometry_type>;
     line_clipper clipped(geom);
     clipped.clip_box(bbox.minx(),bbox.miny(),bbox.maxx(),bbox.maxy());
     return dump_path(clipped);

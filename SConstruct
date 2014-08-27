@@ -93,7 +93,6 @@ pretty_dep_names = {
     'gdal-config':'gdal-config program | try setting GDAL_CONFIG SCons option',
     'freetype-config':'freetype-config program | try setting FREETYPE_CONFIG SCons option',
     'osm':'more info: https://github.com/mapnik/mapnik/wiki/OsmPlugin',
-    'curl':'libcurl is required for the "osm" plugin - more info: https://github.com/mapnik/mapnik/wiki/OsmPlugin',
     'boost_regex_icu':'libboost_regex built with optional ICU unicode support is needed for unicode regex support in mapnik.',
     'sqlite_rtree':'The SQLite plugin requires libsqlite3 built with RTREE support (-DSQLITE_ENABLE_RTREE=1)',
     'pgsql2sqlite_rtree':'The pgsql2sqlite program requires libsqlite3 built with RTREE support (-DSQLITE_ENABLE_RTREE=1)'
@@ -104,6 +103,7 @@ pretty_dep_names = {
 PLUGINS = { # plugins with external dependencies
             # configured by calling project, hence 'path':None
             'postgis': {'default':True,'path':None,'inc':'libpq-fe.h','lib':'pq','lang':'C'},
+            'pgraster': {'default':True,'path':None,'inc':'libpq-fe.h','lib':'pq','lang':'C'},
             'gdal':    {'default':True,'path':None,'inc':'gdal_priv.h','lib':'gdal','lang':'C++'},
             'ogr':     {'default':True,'path':None,'inc':'ogrsf_frmts.h','lib':'gdal','lang':'C++'},
             # configured with custom paths, hence 'path': PREFIX/INCLUDES/LIBS
@@ -112,7 +112,7 @@ PLUGINS = { # plugins with external dependencies
             'rasterlite':  {'default':False,'path':'RASTERLITE','inc':['sqlite3.h','rasterlite.h'],'lib':'rasterlite','lang':'C'},
 
             # todo: osm plugin does also depend on libxml2 (but there is a separate check for that)
-            'osm':     {'default':False,'path':None,'inc':'curl/curl.h','lib':'curl','lang':'C'},
+            'osm':     {'default':False,'path':None,'inc':None,'lib':None,'lang':'C'},
 
             # plugins without external dependencies requiring CheckLibWithHeader...
             'shape':   {'default':True,'path':None,'inc':None,'lib':None,'lang':'C++'},
@@ -193,7 +193,7 @@ def shortest_name(libs):
 
 def rm_path(item,set,_env):
     for i in _env[set]:
-        if item in i:
+        if i.startswith(item):
             _env[set].remove(i)
 
 def sort_paths(items,priority):
@@ -316,6 +316,7 @@ opts.AddVariables(
     ('PATH', 'A custom path (or multiple paths divided by ":") to append to the $PATH env to prioritize usage of command line programs (if multiple are present on the system)', ''),
     ('PATH_REMOVE', 'A path prefix to exclude from all known command and compile paths (create multiple excludes separated by :)', ''),
     ('PATH_REPLACE', 'Two path prefixes (divided with a :) to search/replace from all known command and compile paths', ''),
+    ('MAPNIK_NAME', 'Name of library', 'mapnik'),
 
     # Boost variables
     # default is '/usr/include', see FindBoost method below
@@ -400,6 +401,7 @@ opts.AddVariables(
     BoolVariable('PGSQL2SQLITE', 'Compile and install a utility to convert postgres tables to sqlite', 'False'),
     BoolVariable('SHAPEINDEX', 'Compile and install a utility to generate shapefile indexes in the custom format (.index) Mapnik supports', 'True'),
     BoolVariable('SVG2PNG', 'Compile and install a utility to generate render an svg file to a png on the command line', 'False'),
+    BoolVariable('NIK2IMG', 'Compile and install a utility to generate render a map to an image', 'True'),
     BoolVariable('COLOR_PRINT', 'Print build status information in color', 'True'),
     BoolVariable('SAMPLE_INPUT_PLUGINS', 'Compile and install sample plugins', 'False'),
     BoolVariable('BIGINT', 'Compile support for 64-bit integers in mapnik::value', 'True'),
@@ -492,14 +494,17 @@ HELP_REQUESTED = False
 if ('-h' in command_line_args) or ('--help' in command_line_args):
     HELP_REQUESTED = True
 
-if ('install' not in command_line_args) and ('-c' in command_line_args) or ('--clean' in command_line_args):
-    HELP_REQUESTED = True
-
 if 'configure' in command_line_args and not HELP_REQUESTED:
     force_configure = True
 elif HELP_REQUESTED:
     # to ensure config gets skipped when help is requested
     preconfigured = True
+
+# need no-op for clean on fresh checkout
+# https://github.com/mapnik/mapnik/issues/2112
+if ('-c' in command_line_args) or ('--clean' in command_line_args) and not os.path.exists(SCONS_CONFIGURE_CACHE):
+    print 'all good: nothing to clean'
+    Exit(0)
 
 # initially populate environment with defaults and any possible custom arguments
 opts.Update(env)
@@ -615,10 +620,12 @@ def parse_config(context, config, checks='--libs --cflags'):
     if not parsed:
         if config in ('GDAL_CONFIG'):
             # optional deps...
-            env['SKIPPED_DEPS'].append(tool)
+            if tool not in env['SKIPPED_DEPS']:
+                env['SKIPPED_DEPS'].append(tool)
             conf.rollback_option(config)
         else: # freetype and libxml2, not optional
-            env['MISSING_DEPS'].append(tool)
+            if tool not in env['MISSING_DEPS']:
+                env['MISSING_DEPS'].append(tool)
     context.Result( ret )
     return ret
 
@@ -674,7 +681,8 @@ def ogr_enabled(context):
     context.Message( 'Checking if gdal is ogr enabled... ')
     ret = context.TryAction('%s --ogr-enabled' % env['GDAL_CONFIG'])[0]
     if not ret:
-        env['SKIPPED_DEPS'].append('ogr')
+        if 'ogr' not in env['SKIPPED_DEPS']:
+            env['SKIPPED_DEPS'].append('ogr')
     context.Result( ret )
     return ret
 
@@ -1148,9 +1156,9 @@ if not preconfigured:
         env['MAPNIK_FONTS_DEST'] = os.path.join(env['MAPNIK_LIB_DIR_DEST'],'fonts')
 
     if env['LINKING'] == 'static':
-       env['MAPNIK_LIB_NAME'] = '${LIBPREFIX}mapnik${LIBSUFFIX}'
+       env['MAPNIK_LIB_NAME'] = '${LIBPREFIX}${MAPNIK_NAME}${LIBSUFFIX}'
     else:
-       env['MAPNIK_LIB_NAME'] = '${SHLIBPREFIX}mapnik${SHLIBSUFFIX}'
+       env['MAPNIK_LIB_NAME'] = '${SHLIBPREFIX}${MAPNIK_NAME}${SHLIBSUFFIX}'
 
     if env['PKG_CONFIG_PATH']:
         env['ENV']['PKG_CONFIG_PATH'] = os.path.realpath(env['PKG_CONFIG_PATH'])
@@ -1215,6 +1223,7 @@ if not preconfigured:
             temp_env = env.Clone()
             temp_env['LIBS'] = []
             try:
+                # TODO - freetype-config accepts --static as of v2.5.3
                 temp_env.ParseConfig('%s --libs' % env['FREETYPE_CONFIG'])
                 if 'bz2' in temp_env['LIBS']:
                     env['EXTRA_FREETYPE_LIBS'].append('bz2')
@@ -1287,7 +1296,7 @@ if not preconfigured:
 
     # test for C++11 support, which is required
     if not conf.supports_cxx11():
-        color_print(1,"C++ compiler does not support C++11 standard, which is required. Please use Mapnik 2.x instead of 3.x as an alternative")
+        color_print(1,"C++ compiler does not support C++11 standard (-std=c++11), which is required. Please upgrade your compiler to at least g++ 4.7 (ideally 4.8)")
         Exit(1)
 
     if not env['HOST']:
@@ -1421,22 +1430,21 @@ if not preconfigured:
                                      env['LIBS'].remove(libname)
                             else:
                                 details['lib'] = libname
-                elif plugin == 'postgis':
+                elif plugin == 'postgis' or plugin == 'pgraster':
                     conf.parse_pg_config('PG_CONFIG')
                 elif plugin == 'ogr':
                     if conf.ogr_enabled():
-                        if not 'gdal' in env['REQUESTED_PLUGINS']:
-                            conf.parse_config('GDAL_CONFIG',checks='--libs')
+                        if conf.parse_config('GDAL_CONFIG',checks='--libs'):
                             conf.parse_config('GDAL_CONFIG',checks='--cflags')
-                        libname = conf.get_pkg_lib('GDAL_CONFIG','ogr')
-                        if libname:
-                            if not conf.CheckLibWithHeader(libname, details['inc'], details['lang']):
-                                if 'gdal' not in env['SKIPPED_DEPS']:
-                                    env['SKIPPED_DEPS'].append('gdal')
-                                if libname in env['LIBS']:
-                                     env['LIBS'].remove(libname)
-                            else:
-                                details['lib'] = libname
+                            libname = conf.get_pkg_lib('GDAL_CONFIG','ogr')
+                            if libname:
+                                if not conf.CheckLibWithHeader(libname, details['inc'], details['lang']):
+                                    if 'gdal' not in env['SKIPPED_DEPS']:
+                                        env['SKIPPED_DEPS'].append('gdal')
+                                    if libname in env['LIBS']:
+                                         env['LIBS'].remove(libname)
+                                else:
+                                    details['lib'] = libname
                 elif details['path'] and details['lib'] and details['inc']:
                     backup = env.Clone().Dictionary()
                     # Note, the 'delete_existing' keyword makes sure that these paths are prepended
@@ -1524,7 +1532,7 @@ if not preconfigured:
                 env["CAIRO_ALL_LIBS"] = ['cairo']
                 if env['RUNTIME_LINK'] == 'static':
                     env["CAIRO_ALL_LIBS"].extend(
-                        ['pixman-1','expat','fontconfig']
+                        ['pixman-1','expat']
                     )
                 # todo - run actual checkLib?
                 env['HAS_CAIRO'] = True
@@ -1778,7 +1786,7 @@ if not preconfigured:
         else:
             # TODO - add back -fvisibility-inlines-hidden
             # https://github.com/mapnik/mapnik/issues/1863
-            env.Append(CXXFLAGS = common_cxx_flags + '-O%s -fno-strict-aliasing -finline-functions -Wno-inline -Wno-parentheses -Wno-char-subscripts' % (env['OPTIMIZATION']))
+            env.Append(CXXFLAGS = common_cxx_flags + '-O%s -fno-strict-aliasing -Wno-inline -Wno-parentheses -Wno-char-subscripts' % (env['OPTIMIZATION']))
         if env['DEBUG_UNDEFINED']:
             env.Append(CXXFLAGS = '-fsanitize=undefined-trap -fsanitize-undefined-trap-on-error -ftrapv -fwrapv')
 
@@ -1979,6 +1987,8 @@ if not HELP_REQUESTED:
                 SConscript('utils/pgsql2sqlite/build.py')
             if env['SVG2PNG']:
                 SConscript('utils/svg2png/build.py')
+            if env['NIK2IMG']:
+                SConscript('utils/nik2img/build.py')
             # devtools not ready for public
             #SConscript('utils/ogrindex/build.py')
             env['LIBS'].remove('boost_program_options%s' % env['BOOST_APPEND'])
@@ -2000,9 +2010,6 @@ if not HELP_REQUESTED:
 
     # build C++ tests
     SConscript('tests/cpp_tests/build.py')
-
-    if env['CPP_TESTS'] and env['SVG_RENDERER']:
-        SConscript('tests/cpp_tests/svg_renderer_tests/build.py')
 
     if env['BENCHMARK']:
         SConscript('benchmark/build.py')

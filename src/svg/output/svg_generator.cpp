@@ -20,10 +20,13 @@
  *
  *****************************************************************************/
 
+#if defined(SVG_RENDERER)
+
 // mapnik
 #include <mapnik/svg/output/svg_generator.hpp>
 #include <mapnik/geometry.hpp>
 #include <mapnik/util/conversions.hpp>
+#include <mapnik/svg/output/svg_output_grammars.hpp>
 
 // boost
 #include <boost/spirit/include/karma.hpp>
@@ -50,7 +53,8 @@ namespace mapnik { namespace svg {
     template <typename OutputIterator>
     void svg_generator<OutputIterator>::generate_opening_root(root_output_attributes const& root_attributes)
     {
-        root_attributes_grammar attributes_grammar;
+        using root_attributes_grammar = svg::svg_root_attributes_grammar<OutputIterator>;
+        static const root_attributes_grammar attributes_grammar;
         karma::lit_type lit;
         karma::generate(output_iterator_, lit("<svg ") << attributes_grammar << lit(">\n"), root_attributes);
     }
@@ -65,7 +69,8 @@ namespace mapnik { namespace svg {
     template <typename OutputIterator>
     void svg_generator<OutputIterator>::generate_rect(rect_output_attributes const& rect_attributes)
     {
-        rect_attributes_grammar attributes_grammar;
+        using rect_attributes_grammar = svg::svg_rect_attributes_grammar<OutputIterator>;
+        static const rect_attributes_grammar attributes_grammar;
         karma::lit_type lit;
         karma::generate(output_iterator_, lit("<rect ") << attributes_grammar << lit("/>\n"), rect_attributes);
     }
@@ -109,3 +114,6 @@ namespace mapnik { namespace svg {
 
     template class svg_generator<std::ostream_iterator<char> >;
     }}
+
+#endif
+

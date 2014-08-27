@@ -52,12 +52,7 @@
 
 #define PROJ_ENVELOPE_POINTS 20
 
-#include <boost/thread/locks.hpp>
-#include <mutex>
-
-namespace mapnik
-{
-typedef boost::unique_lock<std::mutex> scoped_lock;
-}
+#define BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS
+#define BOOST_MPL_LIMIT_VECTOR_SIZE 30
 
 #endif // MAPNIK_CONFIG_HPP

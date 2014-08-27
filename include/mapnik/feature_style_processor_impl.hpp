@@ -44,11 +44,7 @@
 #include <mapnik/projection.hpp>
 #include <mapnik/proj_transform.hpp>
 #include <mapnik/util/featureset_buffer.hpp>
-
-// boost
-#include <boost/variant/apply_visitor.hpp>
-#include <boost/variant/static_visitor.hpp>
-
+#include <mapnik/util/variant.hpp>
 // stl
 #include <vector>
 #include <stdexcept>
@@ -87,7 +83,7 @@ struct process_impl<false>
  * \param sym        Symbolizer object
  */
 template <typename Processor>
-struct feature_style_processor<Processor>::symbol_dispatch : public boost::static_visitor<>
+struct feature_style_processor<Processor>::symbol_dispatch : public util::static_visitor<>
 {
     symbol_dispatch (Processor & output,
                      mapnik::feature_impl & f,
@@ -107,8 +103,8 @@ struct feature_style_processor<Processor>::symbol_dispatch : public boost::stati
     proj_transform const& prj_trans_;
 };
 
-typedef char (&no_tag)[1];
-typedef char (&yes_tag)[2];
+using no_tag = char (&)[1];
+using yes_tag = char (&)[2];
 
 template <typename T0, typename T1, void (T0::*)(T1 const&, mapnik::feature_impl &, proj_transform const&) >
 struct process_memfun_helper {};
@@ -119,7 +115,7 @@ template <typename T0, typename T1> yes_tag has_process_helper(process_memfun_he
 template<typename T0,typename T1>
 struct has_process
 {
-    typedef typename T0::processor_impl_type processor_impl_type;
+    using processor_impl_type = typename T0::processor_impl_type;
     BOOST_STATIC_CONSTANT(bool
                           , value = sizeof(has_process_helper<processor_impl_type,T1>(0)) == sizeof(yes_tag)
         );
@@ -143,7 +139,7 @@ struct layer_rendering_material
         proj1_(lay.srs(),true) {}
 };
 
-typedef std::shared_ptr<layer_rendering_material> layer_rendering_material_ptr;
+using layer_rendering_material_ptr = std::shared_ptr<layer_rendering_material>;
 
 
 template <typename Processor>
@@ -471,6 +467,7 @@ void feature_style_processor<Processor>::prepare_layer(layer_rendering_material 
                                height/qh);
 
     query q(layer_ext,res,scale_denom,extent);
+    q.set_variables(p.variables());
 
     if (p.attribute_collection_policy() == COLLECT_ALL)
     {
@@ -643,6 +640,7 @@ void feature_style_processor<Processor>::render_style(
         p.end_style_processing(*style);
         return;
     }
+    mapnik::attributes vars = p.variables();
     feature_ptr feature;
     bool was_painted = false;
     while ((feature = features->next()))
@@ -652,7 +650,7 @@ void feature_style_processor<Processor>::render_style(
         for (rule const* r : rc.get_if_rules() )
         {
             expression_ptr const& expr = r->get_filter();
-            value_type result = boost::apply_visitor(evaluate<feature_impl,value_type>(*feature),*expr);
+            value_type result = util::apply_visitor(evaluate<feature_impl,value_type,attributes>(*feature,vars),*expr);
             if (result.to_bool())
             {
                 was_painted = true;
@@ -663,7 +661,7 @@ void feature_style_processor<Processor>::render_style(
                 {
                     for (symbolizer const& sym : symbols)
                     {
-                        boost::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
+                        util::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
                     }
                 }
                 if (style->get_filter_mode() == FILTER_FIRST)
@@ -684,7 +682,7 @@ void feature_style_processor<Processor>::render_style(
                 {
                     for (symbolizer const& sym : symbols)
                     {
-                        boost::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
+                        util::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
                     }
                 }
             }
@@ -699,7 +697,7 @@ void feature_style_processor<Processor>::render_style(
                 {
                     for (symbolizer const& sym : symbols)
                     {
-                        boost::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
+                        util::apply_visitor(symbol_dispatch(p,*feature,prj_trans),sym);
                     }
                 }
             }

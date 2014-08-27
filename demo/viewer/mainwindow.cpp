@@ -39,10 +39,11 @@
 // mapnik
 
 #ifndef Q_MOC_RUN // QT moc chokes on BOOST_JOIN
-#include <mapnik/config_error.hpp>
+//#include <mapnik/config_error.hpp>
 #include <mapnik/load_map.hpp>
 #include <mapnik/save_map.hpp>
 #include <mapnik/projection.hpp>
+#include <mapnik/util/timer.hpp>
 #endif
 
 // qt
@@ -52,6 +53,9 @@
 #include "layerwidget.hpp"
 #include "layerdelegate.hpp"
 #include "about_dialog.hpp"
+
+// boost
+#include <boost/algorithm/string.hpp>
 
 MainWindow::MainWindow()
     : filename_(),
@@ -182,19 +186,20 @@ void MainWindow::save()
 
 void MainWindow::load_map_file(QString const& filename)
 {
-    std::cout<<"loading "<< filename.toStdString() << std::endl;
+    std::cout << "loading "<< filename.toStdString() << std::endl;
     unsigned width = mapWidget_->width();
     unsigned height = mapWidget_->height();
     std::shared_ptr<mapnik::Map> map(new mapnik::Map(width,height));
     mapWidget_->setMap(map);
     try
     {
+        mapnik::auto_cpu_timer t(std::clog, "loading map took: ");
         mapnik::load_map(*map,filename.toStdString());
     }
-    catch (mapnik::config_error & ex)
-    {
-        std::cout << ex.what() << "\n";
-    }
+    //catch (mapnik::config_error & ex)
+    //{
+    //    std::cout << ex.what() << "\n";
+    //}
     catch (...)
     {
         std::cerr << "Exception caught in load_map\n";
@@ -440,4 +445,9 @@ void MainWindow::zoom_all()
         mapnik::box2d<double> const& ext = map_ptr->get_current_extent();
         mapWidget_->zoomToBox(ext);
     }
+}
+
+std::shared_ptr<mapnik::Map> MainWindow::get_map()
+{
+    return mapWidget_->getMap();
 }

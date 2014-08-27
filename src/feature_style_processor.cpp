@@ -33,7 +33,7 @@
 
 #if defined(HAVE_CAIRO)
 #include <cairo.h>
-#include <mapnik/cairo_renderer.hpp>
+#include <mapnik/cairo/cairo_renderer.hpp>
 #endif
 
 #if defined(SVG_RENDERER)
@@ -45,7 +45,6 @@ namespace mapnik
 
 #if defined(HAVE_CAIRO)
 template class feature_style_processor<cairo_renderer<cairo_ptr> >;
-template class feature_style_processor<cairo_renderer<cairo_surface_ptr> >;
 #endif
 
 #if defined(SVG_RENDERER)

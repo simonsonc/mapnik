@@ -2,6 +2,7 @@
 #define PYTHON_FEATURESET_HPP
 
 // mapnik
+#include <mapnik/config.hpp>
 #include <mapnik/feature.hpp>
 
 // boost
@@ -24,7 +25,7 @@ public:
     mapnik::feature_ptr next();
 
 private:
-    typedef boost::python::stl_input_iterator<mapnik::feature_ptr> feature_iter;
+    using feature_iter = boost::python::stl_input_iterator<mapnik::feature_ptr>;
 
     feature_iter begin_, end_;
 };

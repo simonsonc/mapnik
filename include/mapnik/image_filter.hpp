@@ -28,11 +28,8 @@
 #include <mapnik/image_filter_types.hpp>
 #include <mapnik/util/hsl.hpp>
 
-// boost
-#include <boost/variant/static_visitor.hpp>
+// boost GIL
 #include <boost/gil/gil_all.hpp>
-#include <boost/concept_check.hpp>
-
 
 // agg
 #include "agg_basics.h"
@@ -112,7 +109,7 @@
 //  kernel_1d_fixed<float,9> kernel(conv,4);
 
 // color_converted_view<rgb8_pixel_t>(src_view);
-//typedef kth_channel_view_type< 0, const rgba8_view_t>::type view_t;
+//using view_t = kth_channel_view_type< 0, const rgba8_view_t>::type;
 
 //view_t red = kth_channel_view<0>(const_view(src_view));
 
@@ -176,11 +173,8 @@ void process_channel_impl (Src const& src, Dst & dst, Conv const& k)
 }
 
 template <typename Src, typename Dst, typename Conv>
-void process_channel (Src const& src, Dst & dst, Conv const& k)
+void process_channel (Src const&, Dst &, Conv const&)
 {
-    boost::ignore_unused_variable_warning(src);
-    boost::ignore_unused_variable_warning(dst);
-    boost::ignore_unused_variable_warning(k);
 }
 
 template <typename Src, typename Dst>
@@ -254,7 +248,7 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
     // top row
     for (int x = 0 ; x < src_view.width(); ++x)
     {
-        *dst_it = src_loc[loc11];
+        (*dst_it)[3] = src_loc[loc11][3]; // Dst.a = Src.a
         for (int i = 0; i < 3; ++i)
         {
             bits32f p[9];
@@ -284,7 +278,6 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
                 p[8] = src_loc[loc22][i];
             }
 
-
             p[0] = p[6];
             p[1] = p[7];
             p[2] = p[8];
@@ -302,7 +295,7 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
     {
         for (int x = 0; x < src_view.width(); ++x)
         {
-            *dst_it = src_loc[loc11];
+            (*dst_it)[3] = src_loc[loc11][3]; // Dst.a = Src.a
             for (int i = 0; i < 3; ++i)
             {
                 bits32f p[9];
@@ -349,7 +342,7 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
     //src_loc = src_view.xy_at(0,src_view.height()-1);
     for (int x = 0 ; x < src_view.width(); ++x)
     {
-        *dst_it = src_loc[loc11];
+        (*dst_it)[3] = src_loc[loc11][3]; // Dst.a = Src.a
         for (int i = 0; i < 3; ++i)
         {
             bits32f p[9];
@@ -383,7 +376,6 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
             p[6] = p[0];
             p[7] = p[1];
             p[8] = p[2];
-
             process_channel(p, (*dst_it)[i], filter);
         }
         ++src_loc.x();
@@ -394,8 +386,12 @@ void apply_convolution_3x3(Src const& src_view, Dst & dst_view, Filter const& fi
 template <typename Src, typename Filter>
 void apply_filter(Src & src, Filter const& filter)
 {
-    double_buffer<Src> tb(src);
-    apply_convolution_3x3(tb.src_view, tb.dst_view, filter);
+    {
+        src.demultiply();
+        double_buffer<Src> tb(src);
+        apply_convolution_3x3(tb.src_view, tb.dst_view, filter);
+    } // ensure ~double_buffer() is called before premultiplying
+    src.premultiply();
 }
 
 template <typename Src>
@@ -761,7 +757,7 @@ void apply_filter(Src & src, invert const& /*op*/)
 }
 
 template <typename Src>
-struct filter_visitor : boost::static_visitor<void>
+struct filter_visitor : util::static_visitor<void>
 {
     filter_visitor(Src & src)
     : src_(src) {}
@@ -775,7 +771,7 @@ struct filter_visitor : boost::static_visitor<void>
     Src & src_;
 };
 
-struct filter_radius_visitor : boost::static_visitor<void>
+struct filter_radius_visitor : util::static_visitor<void>
 {
     int & radius_;
     filter_radius_visitor(int & radius)

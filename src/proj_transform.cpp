@@ -22,6 +22,8 @@
 
 // mapnik
 #include <mapnik/global.hpp>
+#include <mapnik/box2d.hpp>
+#include <mapnik/projection.hpp>
 #include <mapnik/proj_transform.hpp>
 #include <mapnik/coord.hpp>
 #include <mapnik/utils.hpp>
@@ -267,6 +269,11 @@ bool proj_transform::backward(box2d<double>& env, int points) const
     if (is_source_equal_dest_)
         return true;
 
+    if (wgs84_to_merc_ || merc_to_wgs84_)
+    {
+        return backward(env);
+    }
+
     std::vector<coord<double,2> > coords;
     envelope_points(coords, env, points);
 
@@ -291,6 +298,11 @@ bool proj_transform::forward(box2d<double>& env, int points) const
 {
     if (is_source_equal_dest_)
         return true;
+
+    if (wgs84_to_merc_ || merc_to_wgs84_)
+    {
+        return forward(env);
+    }
 
     std::vector<coord<double,2> > coords;
     envelope_points(coords, env, points);

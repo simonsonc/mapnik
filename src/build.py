@@ -59,7 +59,8 @@ system = 'boost_system%s' % env['BOOST_APPEND']
 
 # clear out and re-set libs for this env
 # note: order matters on linux: see lorder | tsort
-lib_env['LIBS'] = [filesystem,regex]
+lib_env['LIBS'] = [filesystem,
+                   regex]
 
 if env['HAS_CAIRO']:
     lib_env.Append(LIBS=env['CAIRO_ALL_LIBS'])
@@ -143,73 +144,56 @@ else: # unix, non-macos
 
 source = Split(
     """
+    expression_grammar.cpp
     fs.cpp
-    debug_symbolizer.cpp
     request.cpp
     well_known_srs.cpp
     params.cpp
     image_filter_types.cpp
     miniz_png.cpp
     color.cpp
-    css_color_grammar.cpp
     conversions.cpp
     image_compositing.cpp
-    image_filter_grammar.cpp
     image_scaling.cpp
     box2d.cpp
-    building_symbolizer.cpp
     datasource_cache.cpp
     datasource_cache_static.cpp
     debug.cpp
     expression_node.cpp
-    expression_grammar.cpp
     expression_string.cpp
     expression.cpp
-    transform_expression_grammar.cpp
     transform_expression.cpp
     feature_kv_iterator.cpp
     feature_style_processor.cpp
     feature_type_style.cpp
     font_engine_freetype.cpp
     font_set.cpp
-    gamma_method.cpp
+    function_call.cpp
     gradient.cpp
     graphics.cpp
+    parse_path.cpp
     image_reader.cpp
     image_util.cpp
     layer.cpp
-    line_symbolizer.cpp
-    line_pattern_symbolizer.cpp
     map.cpp
     load_map.cpp
     memory.cpp
-    parse_path.cpp
-    parse_transform.cpp
     palette.cpp
-    path_expression_grammar.cpp
     plugin.cpp
-    point_symbolizer.cpp
-    polygon_pattern_symbolizer.cpp
-    polygon_symbolizer.cpp
     rule.cpp
     save_map.cpp
-    shield_symbolizer.cpp
-    text_symbolizer.cpp
     wkb.cpp
     projection.cpp
     proj_transform.cpp
-    distance.cpp
     scale_denominator.cpp
     simplify.cpp
+    parse_transform.cpp
     memory_datasource.cpp
-    stroke.cpp
     symbolizer.cpp
+    symbolizer_keys.cpp
+    symbolizer_enumerations.cpp
     unicode.cpp
-    markers_symbolizer.cpp
     raster_colorizer.cpp
-    raster_symbolizer.cpp
-    wkt/wkt_factory.cpp
-    wkt/wkt_generator.cpp
     mapped_memory_cache.cpp
     marker_cache.cpp
     svg/svg_parser.cpp
@@ -217,36 +201,38 @@ source = Split(
     svg/svg_points_parser.cpp
     svg/svg_transform_parser.cpp
     warp.cpp
-    json/geometry_grammar.cpp
-    json/geometry_parser.cpp
-    json/feature_grammar.cpp
-    json/feature_parser.cpp
-    json/feature_collection_parser.cpp
-    json/geojson_generator.cpp
+    css_color_grammar.cpp
     text/vertex_cache.cpp
-    text/layout.cpp
+    text/text_layout.cpp
     text/text_line.cpp
     text/itemizer.cpp
     text/scrptrun.cpp
     text/face.cpp
     text/placement_finder.cpp
+    text/properties_util.cpp
     text/renderer.cpp
     text/symbolizer_helpers.cpp
     text/text_properties.cpp
     text/formatting/base.cpp
-    text/formatting/expression.cpp
     text/formatting/list.cpp
     text/formatting/text.cpp
     text/formatting/format.cpp
+    text/formatting/layout.cpp
     text/formatting/registry.cpp
     text/placements/registry.cpp
     text/placements/base.cpp
     text/placements/dummy.cpp
     text/placements/list.cpp
     text/placements/simple.cpp
+    group/group_layout_manager.cpp
+    group/group_rule.cpp
+    group/group_symbolizer_helper.cpp
     xml_tree.cpp
     config_error.cpp
     color_factory.cpp
+    renderer_common.cpp
+    renderer_common/render_pattern.cpp
+    renderer_common/process_group_symbolizer.cpp
     """
     )
 
@@ -287,8 +273,20 @@ if env['HAS_CAIRO']:
     lib_env.Append(CPPDEFINES = '-DHAVE_CAIRO')
     libmapnik_defines.append('-DHAVE_CAIRO')
     lib_env.AppendUnique(CPPPATH=copy(env['CAIRO_CPPPATHS']))
-    source.insert(0,'cairo_renderer.cpp')
-    source.insert(0,'cairo_context.cpp')
+    source.append('cairo/cairo_context.cpp')
+    source.append('cairo/cairo_renderer.cpp')
+    source.append('cairo/cairo_render_vector.cpp')
+    source.append('cairo/process_markers_symbolizer.cpp')
+    source.append('cairo/process_text_symbolizer.cpp')
+    source.append('cairo/process_group_symbolizer.cpp')
+    source.append('cairo/process_line_symbolizer.cpp')
+    source.append('cairo/process_line_pattern_symbolizer.cpp')
+    source.append('cairo/process_polygon_symbolizer.cpp')
+    source.append('cairo/process_polygon_pattern_symbolizer.cpp')
+    source.append('cairo/process_debug_symbolizer.cpp')
+    source.append('cairo/process_point_symbolizer.cpp')
+    source.append('cairo/process_raster_symbolizer.cpp')
+    source.append('cairo/process_building_symbolizer.cpp')
 
 for cpp in enabled_imaging_libraries:
     source.append(cpp)
@@ -307,6 +305,7 @@ source += Split(
     agg/process_raster_symbolizer.cpp
     agg/process_shield_symbolizer.cpp
     agg/process_markers_symbolizer.cpp
+    agg/process_group_symbolizer.cpp
     agg/process_debug_symbolizer.cpp
     """
     )
@@ -336,6 +335,7 @@ if env['GRID_RENDERER']:
         grid/process_raster_symbolizer.cpp
         grid/process_shield_symbolizer.cpp
         grid/process_text_symbolizer.cpp
+        grid/process_group_symbolizer.cpp
         """)
     lib_env.Append(CPPDEFINES = '-DGRID_RENDERER')
     libmapnik_defines.append('-DGRID_RENDERER')
@@ -358,6 +358,7 @@ if env['SVG_RENDERER']: # svg backend
     svg/output/process_raster_symbolizer.cpp
     svg/output/process_shield_symbolizer.cpp
     svg/output/process_text_symbolizer.cpp
+    svg/output/process_group_symbolizer.cpp
     """)
     lib_env.Append(CPPDEFINES = '-DSVG_RENDERER')
     libmapnik_defines.append('-DSVG_RENDERER')
@@ -383,7 +384,6 @@ lib_env_final.Prepend(LINKFLAGS=mapnik_lib_link_flag)
 # cache library values for other builds to use
 env['LIBMAPNIK_LIBS'] = copy(lib_env['LIBS'])
 env['LIBMAPNIK_LINKFLAGS'] = copy(lib_env['LINKFLAGS'])
-env.Append(LIBMAPNIK_LINKFLAGS=env['CUSTOM_LDFLAGS'])
 env['LIBMAPNIK_CXXFLAGS'] = libmapnik_cxxflags
 env['LIBMAPNIK_DEFINES'] = libmapnik_defines
 
@@ -393,9 +393,9 @@ if env['PLATFORM'] == 'Darwin' or not env['ENABLE_SONAME']:
     target_path = env['MAPNIK_LIB_BASE_DEST']
     if 'uninstall' not in COMMAND_LINE_TARGETS:
         if env['LINKING'] == 'static':
-            mapnik = lib_env_final.StaticLibrary('mapnik', source)
+            mapnik = lib_env_final.StaticLibrary(env['MAPNIK_NAME'], source)
         else:
-            mapnik = lib_env_final.SharedLibrary('mapnik', source)
+            mapnik = lib_env_final.SharedLibrary(env['MAPNIK_NAME'], source)
         result = env.Install(target_path, mapnik)
         env.Alias(target='install', source=result)
 
@@ -417,9 +417,9 @@ else:
 
     if 'uninstall' not in COMMAND_LINE_TARGETS:
         if env['LINKING'] == 'static':
-            mapnik = lib_env_final.StaticLibrary('mapnik', source)
+            mapnik = lib_env_final.StaticLibrary(env['MAPNIK_NAME'], source)
         else:
-            mapnik = lib_env_final.SharedLibrary('mapnik', source)
+            mapnik = lib_env_final.SharedLibrary(env['MAPNIK_NAME'], source)
         result = env.InstallAs(target=target, source=mapnik)
         env.Alias(target='install', source=result)
         if result:

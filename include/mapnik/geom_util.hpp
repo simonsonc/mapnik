@@ -25,11 +25,9 @@
 
 // mapnik
 #include <mapnik/box2d.hpp>
+#include <mapnik/coord.hpp>
 #include <mapnik/vertex.hpp>
 #include <mapnik/geometry.hpp> // for geometry_type::types (TODO: avoid this interdependence)
-
-// boost
-#include <boost/tuple/tuple.hpp>
 
 // stl
 #include <cmath>
@@ -247,6 +245,46 @@ double path_length(PathType & path)
     return length;
 }
 
+template <typename PathType>
+bool hit_test_first(PathType & path, double x, double y, double tol)
+{
+    bool inside=false;
+    double x0 = 0;
+    double y0 = 0;
+    double x1 = 0;
+    double y1 = 0;
+    path.rewind(0);
+    unsigned command = path.vertex(&x0, &y0);
+    if (command == SEG_END)
+    {
+        return false;
+    }
+    unsigned count = 0;
+    while (SEG_END != (command = path.vertex(&x1, &y1)))
+    {
+        if (command == SEG_CLOSE)
+        {
+            break;
+        }
+        ++count;
+        if (command == SEG_MOVETO)
+        {
+            x0 = x1;
+            y0 = y1;
+            continue;
+        }
+
+        if ((((y1 <= y) && (y < y0)) ||
+             ((y0 <= y) && (y < y1))) &&
+            (x < (x0 - x1) * (y - y1)/ (y0 - y1) + x1))
+            inside=!inside;
+
+        x0 = x1;
+        y0 = y1;
+    }
+    return inside;
+}
+
 namespace label {
 
 template <typename PathType>
@@ -355,7 +393,7 @@ bool centroid_geoms(Iter start, Iter end, double & x, double & y)
 
   while (start!=end)
   {
-    typename Iter::value_type & path = *start++;
+    typename Iter::value_type const& path = *start++;
     path.rewind(0);
     unsigned command = path.vertex(&x0, &y0);
     if (command == SEG_END) continue;
@@ -525,18 +563,17 @@ bool interior_position(PathType & path, double & x, double & y)
     // no intersections we just return the default
     if (intersections.empty())
         return true;
-    x0=intersections[0];
+    std::sort(intersections.begin(), intersections.end());
     double max_width = 0;
-    for (unsigned ii = 1; ii < intersections.size(); ++ii)
+    for (unsigned ii = 1; ii < intersections.size(); ii += 2)
     {
-        double xi=intersections[ii];
-        double xc=(x0+xi)/2.0;
-        double width = std::fabs(xi-x0);
-        if (width > max_width && hit_test(path,xc,y,0))
+        double xlow = intersections[ii-1];
+        double xhigh = intersections[ii];
+        double width = xhigh - xlow;
+        if (width > max_width)
         {
-            x=xc;
+            x = (xlow + xhigh) / 2.0;
             max_width = width;
-            break;
         }
     }
     return true;

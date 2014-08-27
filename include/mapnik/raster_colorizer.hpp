@@ -1,4 +1,3 @@
-
 /*****************************************************************************
  *
  * This file is part of Mapnik (c++ mapping toolkit)
@@ -68,7 +67,8 @@ enum colorizer_mode_enum
 DEFINE_ENUM( colorizer_mode, colorizer_mode_enum );
 
 //! \brief Structure to represent a stop position.
-class MAPNIK_DECL colorizer_stop {
+class MAPNIK_DECL colorizer_stop
+{
 public:
 
     //! \brief Constructor
@@ -141,7 +141,7 @@ private:
 };
 
 
-typedef std::vector<colorizer_stop> colorizer_stops;
+using colorizer_stops = std::vector<colorizer_stop>;
 
 
 //! \brief Class representing the raster colorizer
@@ -226,7 +226,7 @@ private:
 };
 
 
-typedef std::shared_ptr<raster_colorizer> raster_colorizer_ptr;
+using raster_colorizer_ptr = std::shared_ptr<raster_colorizer>;
 
 
 } // mapnik namespace

@@ -21,27 +21,44 @@
  *****************************************************************************/
 
 // mapnik
+#include <mapnik/feature.hpp>
 #include <mapnik/agg_renderer.hpp>
 #include <mapnik/graphics.hpp>
+#include <mapnik/agg_rasterizer.hpp>
 #include <mapnik/text/symbolizer_helpers.hpp>
+#include <mapnik/pixel_position.hpp>
 #include <mapnik/text/renderer.hpp>
+#include <mapnik/renderer_common/clipping_extent.hpp>
 
 namespace mapnik {
 
-template <typename T>
-void  agg_renderer<T>::process(shield_symbolizer const& sym,
-                               mapnik::feature_impl & feature,
-                               proj_transform const& prj_trans)
+template <typename T0, typename T1>
+void  agg_renderer<T0,T1>::process(shield_symbolizer const& sym,
+                                   mapnik::feature_impl & feature,
+                                   proj_transform const& prj_trans)
 {
-    box2d<double> clip_box = clipping_extent();
+    box2d<double> clip_box = clipping_extent(common_);
+    agg::trans_affine tr;
+    auto transform = get_optional<transform_type>(sym, keys::geometry_transform);
+    if (transform) evaluate_transform(tr, feature, common_.vars_, *transform, common_.scale_factor_);
     text_symbolizer_helper helper(
-            sym, feature, prj_trans,
-            width_, height_,
-            scale_factor_,
-            t_, font_manager_, *detector_,
-            clip_box);
+        sym, feature, common_.vars_, prj_trans,
+        common_.width_, common_.height_,
+        common_.scale_factor_,
+        common_.t_, common_.font_manager_, *common_.detector_,
+        clip_box, tr);
 
-    agg_text_renderer<T> ren(*current_buffer_, sym.get_halo_rasterizer(), sym.comp_op(), scale_factor_, font_manager_.get_stroker());
+    halo_rasterizer_enum halo_rasterizer = get<halo_rasterizer_enum>(sym, keys::halo_rasterizer, feature, common_.vars_, HALO_RASTERIZER_FULL);
+    composite_mode_e comp_op = get<composite_mode_e>(sym, keys::comp_op, feature, common_.vars_, src_over);
+    composite_mode_e halo_comp_op = get<composite_mode_e>(sym, keys::halo_comp_op, feature, common_.vars_, src_over);
+    agg_text_renderer<T0> ren(*current_buffer_,
+                              halo_rasterizer,
+                              comp_op,
+                              halo_comp_op,
+                              common_.scale_factor_,
+                              common_.font_manager_.get_stroker());
+
+    double opacity = get<double>(sym,keys::opacity, feature, common_.vars_, 1.0);
 
     placements_list const& placements = helper.get();
     for (glyph_positions_ptr glyphs : placements)
@@ -50,7 +67,7 @@ void  agg_renderer<T>::process(shield_symbolizer const& sym,
             render_marker(glyphs->marker_pos(),
                           *(glyphs->marker()->marker),
                           glyphs->marker()->transform,
-                          sym.get_opacity(), sym.comp_op());
+                          opacity, comp_op);
         ren.render(*glyphs);
     }
 }

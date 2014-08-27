@@ -31,10 +31,8 @@
 #include <mapnik/value_types.hpp>
 #include <unicode/ucnv.h>
 
-// boost
-#include <boost/cstdint.hpp>
-
 // stl
+#include <cstdint>
 #include <string>
 
 namespace mapnik {
@@ -43,7 +41,7 @@ class MAPNIK_DECL transcoder : private mapnik::noncopyable
 {
 public:
     explicit transcoder (std::string const& encoding);
-    mapnik::value_unicode_string transcode(const char* data, boost::int32_t length = -1) const;
+    mapnik::value_unicode_string transcode(const char* data, std::int32_t length = -1) const;
     ~transcoder();
 private:
     bool ok_;
@@ -52,9 +50,12 @@ private:
 }
 
 namespace U_ICU_NAMESPACE {
-inline std::size_t hash_value(mapnik::value_unicode_string const& val) {
+
+inline std::size_t hash_value(mapnik::value_unicode_string const& val)
+{
     return val.hashCode();
 }
+
 }
 
 #endif // MAPNIK_UNICODE_HPP

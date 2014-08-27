@@ -28,12 +28,17 @@
 #include <mapnik/util/conversions.hpp>
 
 // webp
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+extern "C"
+{
 #include <webp/encode.h>
+}
+#pragma clang diagnostic pop
 
 // stl
 #include <stdexcept>
 #include <string>
-#include <cstring>
 
 namespace mapnik {
 
@@ -140,8 +145,7 @@ void save_as_webp(T1& file,
                   WebPConfig const& config,
                   bool alpha)
 {
-    bool valid = WebPValidateConfig(&config);
-    if (!valid)
+    if (WebPValidateConfig(&config) != 1)
     {
         throw std::runtime_error("Invalid configuration");
     }

@@ -20,20 +20,21 @@
  *
  *****************************************************************************/
 
+#include <mapnik/config.hpp>
+
 #include "boost_std_shared_shim.hpp"
 
 // boost
-#include <boost/python/suite/indexing/indexing_suite.hpp>
-//#include <boost/python/suite/indexing/map_indexing_suite.hpp>
+#include <boost/python.hpp>
 #include <boost/python/iterator.hpp>
 #include <boost/python/call_method.hpp>
 #include <boost/python/tuple.hpp>
 #include <boost/python/to_python_converter.hpp>
-#include <boost/python.hpp>
+
 #include <boost/noncopyable.hpp>
 
-
 // mapnik
+
 #include <mapnik/value_types.hpp>
 #include <mapnik/feature.hpp>
 #include <mapnik/feature_factory.hpp>
@@ -42,8 +43,7 @@
 #include <mapnik/wkb.hpp>
 #include <mapnik/wkt/wkt_factory.hpp>
 #include <mapnik/json/feature_parser.hpp>
-#include <mapnik/json/geojson_generator.hpp>
-#include <mapnik/json/generic_json.hpp>
+#include <mapnik/json/feature_generator.hpp>
 
 // stl
 #include <stdexcept>
@@ -51,7 +51,6 @@
 namespace {
 
 using mapnik::geometry_utils;
-using mapnik::from_wkt;
 using mapnik::context_type;
 using mapnik::context_ptr;
 using mapnik::feature_kv_iterator;
@@ -59,13 +58,13 @@ using mapnik::feature_kv_iterator;
 mapnik::geometry_type const& (mapnik::feature_impl::*get_geometry_by_const_ref)(std::size_t) const = &mapnik::feature_impl::get_geometry;
 boost::ptr_vector<mapnik::geometry_type> const& (mapnik::feature_impl::*get_paths_by_const_ref)() const = &mapnik::feature_impl::paths;
 
-void feature_add_geometries_from_wkb(mapnik::feature_impl &feature, std::string wkb)
+void feature_add_geometries_from_wkb(mapnik::feature_impl & feature, std::string wkb)
 {
     bool result = geometry_utils::from_wkb(feature.paths(), wkb.c_str(), wkb.size());
     if (!result) throw std::runtime_error("Failed to parse WKB");
 }
 
-void feature_add_geometries_from_wkt(mapnik::feature_impl &feature, std::string wkt)
+void feature_add_geometries_from_wkt(mapnik::feature_impl & feature, std::string const& wkt)
 {
     bool result = mapnik::from_wkt(wkt, feature.paths());
     if (!result) throw std::runtime_error("Failed to parse WKT");
@@ -73,11 +72,8 @@ void feature_add_geometries_from_wkt(mapnik::feature_impl &feature, std::string 
 
 mapnik::feature_ptr from_geojson_impl(std::string const& json, mapnik::context_ptr const& ctx)
 {
-    mapnik::transcoder tr("utf8");
     mapnik::feature_ptr feature(mapnik::feature_factory::create(ctx,1));
-    mapnik::json::generic_json<std::string::const_iterator> json_base;
-    mapnik::json::feature_parser<std::string::const_iterator> parser(json_base, tr);
-    if (!parser.parse(json.begin(), json.end(), *feature))
+    if (!mapnik::json::from_geojson(json,*feature))
     {
         throw std::runtime_error("Failed to parse geojson feature");
     }
@@ -87,8 +83,7 @@ mapnik::feature_ptr from_geojson_impl(std::string const& json, mapnik::context_p
 std::string feature_to_geojson(mapnik::feature_impl const& feature)
 {
     std::string json;
-    mapnik::json::feature_generator g;
-    if (!g.generate(json,feature))
+    if (!mapnik::json::to_geojson(json,feature))
     {
         throw std::runtime_error("Failed to generate GeoJSON");
     }
@@ -235,7 +230,6 @@ void export_feature()
     class_<mapnik::feature_impl,std::shared_ptr<mapnik::feature_impl>,
         boost::noncopyable>("Feature",init<context_ptr,mapnik::value_integer>("Default ctor."))
         .def("id",&mapnik::feature_impl::id)
-        .def("__str__",&mapnik::feature_impl::to_string)
         .def("add_geometries_from_wkb", &feature_add_geometries_from_wkb)
         .def("add_geometries_from_wkt", &feature_add_geometries_from_wkt)
         .def("add_geometry", &mapnik::feature_impl::add_geometry)

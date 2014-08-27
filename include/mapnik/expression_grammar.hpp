@@ -28,18 +28,27 @@
 #include <mapnik/value_types.hpp>
 #include <mapnik/unicode.hpp>
 #include <mapnik/expression_node.hpp>
+#include <mapnik/function_call.hpp>
 
 // spirit2
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/support_locals.hpp>
-
 // phoenix
 #include <boost/spirit/include/phoenix_function.hpp>
+// fusion
+#include <boost/fusion/adapted/struct.hpp>
+
+BOOST_FUSION_ADAPT_STRUCT(mapnik::unary_function_call,
+                          (mapnik::unary_function_impl, fun)
+                          (mapnik::unary_function_call::argument_type, arg))
+
+BOOST_FUSION_ADAPT_STRUCT(mapnik::binary_function_call,
+                          (mapnik::binary_function_impl, fun)
+                          (mapnik::binary_function_call::argument_type, arg1)
+                          (mapnik::binary_function_call::argument_type, arg2))
 
 namespace mapnik
 {
-
-using namespace boost;
 namespace qi = boost::spirit::qi;
 namespace standard_wide =  boost::spirit::standard_wide;
 using standard_wide::space_type;
@@ -49,7 +58,7 @@ struct unicode_impl
     template <typename T>
     struct result
     {
-        typedef mapnik::value_unicode_string type;
+        using type = mapnik::value_unicode_string;
     };
 
     explicit unicode_impl(mapnik::transcoder const& tr)
@@ -65,14 +74,10 @@ struct unicode_impl
 
 struct regex_match_impl
 {
-#ifdef BOOST_SPIRIT_USE_PHOENIX_V3
     template <typename T>
-#else
-    template <typename T0, typename T1>
-#endif
     struct result
     {
-        typedef expr_node type;
+        using type = expr_node;
     };
 
     explicit regex_match_impl(mapnik::transcoder const& tr)
@@ -87,14 +92,10 @@ struct regex_match_impl
 struct regex_replace_impl
 {
 
-#ifdef BOOST_SPIRIT_USE_PHOENIX_V3
     template <typename T>
-#else
-    template <typename T0, typename T1, typename T2>
-#endif
     struct result
     {
-        typedef expr_node type;
+        using type = expr_node;
     };
 
     explicit regex_replace_impl(mapnik::transcoder const& tr)
@@ -122,7 +123,7 @@ struct geometry_types : qi::symbols<char,mapnik::value_integer>
 template <typename T>
 struct integer_parser
 {
-    typedef qi::int_parser<T,10,1,-1> type;
+    using type = qi::int_parser<T,10,1,-1>;
 };
 
 #ifdef __GNUC__
@@ -133,12 +134,13 @@ template <typename Iterator>
 struct expression_grammar : qi::grammar<Iterator, expr_node(), space_type>
 #endif
 {
-    typedef qi::rule<Iterator, expr_node(), space_type> rule_type;
+    using rule_type = qi::rule<Iterator, expr_node(), space_type>;
 
-    explicit expression_grammar(mapnik::transcoder const& tr);
+    explicit expression_grammar(std::string const& encoding = "utf-8");
 
     qi::real_parser<double, qi::strict_real_policies<double> > strict_double;
     typename integer_parser<mapnik::value_integer>::type int__;
+    mapnik::transcoder tr_;
     boost::phoenix::function<unicode_impl> unicode_;
     boost::phoenix::function<regex_match_impl> regex_match_;
     boost::phoenix::function<regex_replace_impl> regex_replace_;
@@ -152,13 +154,20 @@ struct expression_grammar : qi::grammar<Iterator, expr_node(), space_type>
     rule_type unary_expr;
     rule_type not_expr;
     rule_type primary_expr;
+    qi::rule<Iterator, unary_function_call() , space_type> unary_function_expr;
+    qi::rule<Iterator, binary_function_call() , space_type> binary_function_expr;
     qi::rule<Iterator, std::string() > regex_match_expr;
     qi::rule<Iterator, expr_node(expr_node), qi::locals<std::string,std::string>, space_type> regex_replace_expr;
     qi::rule<Iterator, std::string() , space_type> attr;
-    qi::rule<Iterator, std::string(), qi::locals<char> > ustring;
+    qi::rule<Iterator, std::string() , space_type> global_attr;
+    qi::rule<Iterator, std::string(), qi::locals<char> > quoted_ustring;
+    qi::rule<Iterator, std::string(), space_type> ustring;
+
     qi::symbols<char const, char const> unesc_char;
     qi::rule<Iterator, char() > quote_char;
     geometry_types geom_type;
+    unary_function_types unary_func_type;
+    binary_function_types binary_func_type;
 };
 
 } // namespace

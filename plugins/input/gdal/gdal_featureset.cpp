@@ -21,6 +21,7 @@
  *****************************************************************************/
 
 // mapnik
+#include <mapnik/make_unique.hpp>
 #include <mapnik/global.hpp>
 #include <mapnik/debug.hpp>
 #include <mapnik/image_data.hpp>
@@ -28,10 +29,9 @@
 #include <mapnik/ctrans.hpp>
 #include <mapnik/feature.hpp>
 #include <mapnik/feature_factory.hpp>
-
+#include <mapnik/util/variant.hpp>
 // boost
 #include <boost/format.hpp>
-#include <boost/variant/apply_visitor.hpp>
 // stl
 #include <cmath>
 #include <memory>
@@ -47,10 +47,6 @@ using mapnik::CoordTransform;
 using mapnik::geometry_type;
 using mapnik::datasource_exception;
 using mapnik::feature_factory;
-
-#ifdef _WINDOWS
-using mapnik::rint;
-#endif
 
 gdal_featureset::gdal_featureset(GDALDataset& dataset,
                                  int band,
@@ -93,7 +89,7 @@ feature_ptr gdal_featureset::next()
     {
         first_ = false;
         MAPNIK_LOG_DEBUG(gdal) << "gdal_featureset: Next feature in Dataset=" << &dataset_;
-        return boost::apply_visitor(query_dispatch(*this), gquery_);
+        return mapnik::util::apply_visitor(query_dispatch(*this), gquery_);
     }
     return feature_ptr();
 }
@@ -202,7 +198,7 @@ feature_ptr gdal_featureset::get_feature(mapnik::query const& q)
 
         if (im_width > 0 && im_height > 0)
         {
-            mapnik::raster_ptr raster = std::make_shared<mapnik::raster>(intersect, im_width, im_height);
+            mapnik::raster_ptr raster = std::make_shared<mapnik::raster>(intersect, im_width, im_height, filter_factor);
             feature->set_raster(raster);
             mapnik::image_data_32 & image = raster->data_;
             image.set(0xffffffff);
@@ -277,8 +273,21 @@ feature_ptr gdal_featureset::get_feature(mapnik::query const& q)
                         break;
                     }
                     case GCI_Undefined:
+#if GDAL_VERSION_NUM <= 1730
+                        if (nbands_ == 4)
+                        {
+                            MAPNIK_LOG_DEBUG(gdal) << "gdal_featureset: Found undefined band (assumming alpha band)";
+                            alpha = band;
+                        }
+                        else
+                        {
+                            MAPNIK_LOG_DEBUG(gdal) << "gdal_featureset: Found undefined band (assumming gray band)";
+                            grey = band;
+                        }
+#else
                         MAPNIK_LOG_DEBUG(gdal) << "gdal_featureset: Found undefined band (assumming gray band)";
                         grey = band;
+#endif
                         break;
                     default:
                         MAPNIK_LOG_WARN(gdal) << "gdal_featureset: Band type unknown!";
@@ -390,7 +399,7 @@ feature_ptr gdal_featureset::get_feature(mapnik::query const& q)
                     }
                     else
                     {
-                        MAPNIK_LOG_ERROR(gdal) << "warning: nodata value (" << raster_nodata << ") used to set transparency instead of alpha band";
+                        MAPNIK_LOG_WARN(gdal) << "warning: nodata value (" << raster_nodata << ") used to set transparency instead of alpha band";
                     }
                 }
             }
@@ -449,9 +458,9 @@ feature_ptr gdal_featureset::get_feature_at_point(mapnik::coord2d const& pt)
             {
                 // construct feature
                 feature_ptr feature = feature_factory::create(ctx_,1);
-                geometry_type * point = new geometry_type(mapnik::geometry_type::types::Point);
+                std::unique_ptr<geometry_type> point = std::make_unique<geometry_type>(mapnik::geometry_type::types::Point);
                 point->move_to(pt.x, pt.y);
-                feature->add_geometry(point);
+                feature->add_geometry(point.release());
                 feature->put_new("value",value);
                 if (raster_has_nodata)
                 {

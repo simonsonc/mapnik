@@ -29,9 +29,6 @@
 #include <mapnik/boolean.hpp>
 #include <mapnik/util/conversions.hpp>
 // boost
-#include <boost/variant/static_visitor.hpp>
-#include <boost/variant/apply_visitor.hpp> // keep gcc happy
-#include <boost/variant/variant.hpp>
 #include <boost/optional.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
@@ -55,14 +52,14 @@ struct extract_value
 };
 
 template <>
-struct extract_value<mapnik::boolean>
+struct extract_value<mapnik::boolean_type>
 {
-    static inline boost::optional<mapnik::boolean> do_extract_from_string(std::string const& source)
+    static inline boost::optional<mapnik::boolean_type> do_extract_from_string(std::string const& source)
     {
         bool result;
         if (mapnik::util::string2bool(source, result))
-            return boost::optional<mapnik::boolean>(result);
-        return boost::optional<mapnik::boolean>();
+            return boost::optional<mapnik::boolean_type>(result);
+        return boost::optional<mapnik::boolean_type>();
     }
 };
 
@@ -120,7 +117,7 @@ boost::optional<T> param_cast(std::string const& source)
 } // end namespace detail
 
 template <typename T>
-struct value_extractor_visitor : public boost::static_visitor<>
+struct value_extractor_visitor : public util::static_visitor<>
 {
 
     value_extractor_visitor(boost::optional<T> & var)
@@ -156,8 +153,8 @@ namespace params_detail {
 template <typename T>
 struct converter
 {
-    typedef T value_type;
-    typedef boost::optional<value_type> return_type;
+    using value_type = T;
+    using return_type = boost::optional<value_type>;
     static return_type extract(parameters const& params,
                                std::string const& name,
                                boost::optional<T> const& default_opt_value)
@@ -166,7 +163,7 @@ struct converter
         parameters::const_iterator itr = params.find(name);
         if (itr != params.end())
         {
-            boost::apply_visitor(value_extractor_visitor<T>(result),itr->second);
+            util::apply_visitor(value_extractor_visitor<T>(result),itr->second);
         }
         return result;
     }

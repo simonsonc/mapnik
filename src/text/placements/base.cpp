@@ -24,24 +24,19 @@
 
 namespace mapnik {
 
-text_placements::text_placements() : defaults()
-{
-}
+text_placements::text_placements()
+    : defaults() {}
 
-void text_placements::add_expressions(expression_set &output)
+void text_placements::add_expressions(expression_set & output) const
 {
     defaults.add_expressions(output);
 }
 
 
-/************************************************************************/
 
 text_placement_info::text_placement_info(text_placements const* parent,
                                          double scale_factor_)
     : properties(parent->defaults),
-      scale_factor(scale_factor_)
-{
-    properties.format = std::make_shared<char_properties>(*(properties.format));
-}
+      scale_factor(scale_factor_) {}
 
 } //ns mapnik

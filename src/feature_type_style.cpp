@@ -40,11 +40,13 @@ IMPLEMENT_ENUM( filter_mode_e, filter_mode_strings )
 
 
 feature_type_style::feature_type_style()
-: filter_mode_(FILTER_ALL),
-    filters_(),
-    direct_filters_(),
-    opacity_(1.0f),
-    image_filters_inflate_(false)
+    : rules_(),
+      filter_mode_(FILTER_ALL),
+      filters_(),
+      direct_filters_(),
+      comp_op_(),
+      opacity_(1.0f),
+      image_filters_inflate_(false)
 {}
 
 feature_type_style::feature_type_style(feature_type_style const& rhs)
@@ -58,21 +60,38 @@ feature_type_style::feature_type_style(feature_type_style const& rhs)
 {
 }
 
-feature_type_style& feature_type_style::operator=(feature_type_style const& other)
+feature_type_style& feature_type_style::operator=(feature_type_style rhs)
 {
-    if (this == &other) return *this;
-    rules_ = other.rules_;
-    filters_ = other.filters_;
-    direct_filters_ = other.direct_filters_;
-    comp_op_ = other.comp_op_;
-    opacity_ = other.opacity_;
-    image_filters_inflate_ = other.image_filters_inflate_;
+    swap(*this, rhs);
     return *this;
 }
 
-void feature_type_style::add_rule(rule const& rule)
+void swap( feature_type_style & lhs, feature_type_style & rhs)
 {
-    rules_.push_back(rule);
+    using std::swap;
+    std::swap(lhs.rules_, rhs.rules_);
+    std::swap(lhs.filter_mode_, rhs.filter_mode_);
+    std::swap(lhs.filters_, rhs.filters_);
+    std::swap(lhs.direct_filters_, rhs.direct_filters_);
+    std::swap(lhs.comp_op_, rhs.comp_op_);
+    std::swap(lhs.opacity_, rhs.opacity_);
+    std::swap(lhs.image_filters_inflate_, rhs.image_filters_inflate_);
+}
+
+bool feature_type_style::operator==(feature_type_style const& rhs) const
+{
+    return (rules_ == rhs.rules_) &&
+        (filter_mode_ == rhs.filter_mode_) &&
+        (filters_ == rhs.filters_) &&
+        (direct_filters_ == rhs.direct_filters_) &&
+        (comp_op_ == rhs.comp_op_) &&
+        (opacity_ == rhs.opacity_) &&
+        (image_filters_inflate_ == rhs.image_filters_inflate_);
+}
+
+void feature_type_style::add_rule(rule && rule)
+{
+    rules_.push_back(std::move(rule));
 }
 
 rules const& feature_type_style::get_rules() const

@@ -21,7 +21,7 @@ DATASOURCE_PLUGIN(python_datasource)
 
 python_datasource::python_datasource(parameters const& params)
   : datasource(params),
-    desc_(*params.get<std::string>("type"), *params.get<std::string>("encoding","utf-8")),
+    desc_(python_datasource::name(), *params.get<std::string>("encoding","utf-8")),
     factory_(*params.get<std::string>("factory", ""))
 {
     // extract any remaining parameters as keyword args for the factory
@@ -29,7 +29,7 @@ python_datasource::python_datasource(parameters const& params)
     {
         if((kv.first != "type") && (kv.first != "factory"))
         {
-            kwargs_.insert(std::make_pair(kv.first, *params.get<std::string>(kv.first)));
+            kwargs_.emplace(kv.first, *params.get<std::string>(kv.first));
         }
     }
 
@@ -71,7 +71,7 @@ python_datasource::python_datasource(parameters const& params)
         boost::python::object callable = callable_module.attr(callable_name);
         // prepare the arguments
         boost::python::dict kwargs;
-        typedef std::map<std::string, std::string>::value_type kv_type;
+        using kv_type = std::map<std::string, std::string>::value_type;
         for (kv_type const& kv : kwargs_)
         {
             kwargs[boost::python::str(kv.first)] = boost::python::str(kv.second);
@@ -103,7 +103,7 @@ mapnik::layer_descriptor python_datasource::get_descriptor() const
 
 mapnik::datasource::datasource_t python_datasource::type() const
 {
-    typedef boost::optional<mapnik::datasource::geometry_t> return_type;
+    using return_type = boost::optional<mapnik::datasource::geometry_t>;
 
     try
     {
@@ -162,7 +162,7 @@ mapnik::box2d<double> python_datasource::envelope() const
 
 boost::optional<mapnik::datasource::geometry_t> python_datasource::get_geometry_type() const
 {
-    typedef boost::optional<mapnik::datasource::geometry_t> return_type;
+    using return_type = boost::optional<mapnik::datasource::geometry_t>;
 
     try
     {

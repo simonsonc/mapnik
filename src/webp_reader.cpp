@@ -21,15 +21,18 @@
  *****************************************************************************/
 
 // mapnik
-#include <mapnik/std.hpp>
+#include <mapnik/make_unique.hpp>
 #include <mapnik/debug.hpp>
 #include <mapnik/image_reader.hpp>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
 extern "C"
 {
 #include <webp/types.h>
 #include <webp/decode.h>
 }
+#pragma clang diagnostic pop
 
 // boost
 #include <boost/iostreams/device/file.hpp>
@@ -90,7 +93,7 @@ struct internal_buffer_policy
 template <typename T>
 class webp_reader : public image_reader
 {
-    typedef T buffer_policy_type;
+    using buffer_policy_type = T;
 private:
     struct config_guard
     {
@@ -108,12 +111,14 @@ private:
     size_t size_;
     unsigned width_;
     unsigned height_;
+    bool has_alpha_;
 public:
     explicit webp_reader(char const* data, std::size_t size);
     explicit webp_reader(std::string const& filename);
     ~webp_reader();
     unsigned width() const;
     unsigned height() const;
+    inline bool has_alpha() const { return has_alpha_; }
     bool premultiplied_alpha() const { return false; }
     void read(unsigned x,unsigned y,image_data_32& image);
 private:
@@ -143,7 +148,8 @@ template <typename T>
 webp_reader<T>::webp_reader(char const* data, std::size_t size)
     : buffer_(new buffer_policy_type(reinterpret_cast<uint8_t const*>(data), size)),
       width_(0),
-      height_(0)
+      height_(0),
+      has_alpha_(false)
 {
     init();
 }
@@ -153,7 +159,8 @@ webp_reader<T>::webp_reader(std::string const& filename)
     : buffer_(nullptr),
       size_(0),
       width_(0),
-      height_(0)
+      height_(0),
+      has_alpha_(false)
 {
     std::ifstream file(filename.c_str(), std::ios::binary);
     if (!file)
@@ -188,13 +195,21 @@ webp_reader<T>::~webp_reader()
 template <typename T>
 void webp_reader<T>::init()
 {
-    int width, height;
-    if (!WebPGetInfo(buffer_->data(), buffer_->size(), &width, &height))
+    WebPDecoderConfig config;
+    config_guard guard(config);
+    if (!WebPInitDecoderConfig(&config))
     {
-        throw image_reader_exception("WEBP reader: WebPGetInfo failed");
+        throw image_reader_exception("WEBP reader: WebPInitDecoderConfig failed");
     }
-    width_ = width;
-    height_ = height;
+    if (WebPGetFeatures(buffer_->data(), buffer_->size(), &config.input) == VP8_STATUS_OK) {
+        width_ = config.input.width;
+        height_ = config.input.height;
+        has_alpha_ = config.input.has_alpha;
+    }
+    else
+    {
+        throw image_reader_exception("WEBP reader: WebPGetFeatures failed");
+    }
 }
 
 template <typename T>

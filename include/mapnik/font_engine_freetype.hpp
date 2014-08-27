@@ -25,36 +25,32 @@
 
 // mapnik
 #include <mapnik/config.hpp>
-#include <mapnik/box2d.hpp>
 #include <mapnik/font_set.hpp>
-#include <mapnik/text_symbolizer.hpp>
 #include <mapnik/noncopyable.hpp>
-#include <mapnik/value_types.hpp>
-#include <mapnik/pixel_position.hpp>
 
-// boost
+// stl
 #include <memory>
-
-#include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/optional.hpp>
-#ifdef MAPNIK_THREADSAFE
-#include <thread>
-#endif
-
-//// stl
+#include <map>
+#include <utility> // pair
 #include <vector>
 
+#ifdef MAPNIK_THREADSAFE
+#include <mutex>
+#endif
+
 struct FT_LibraryRec_;
+struct FT_MemoryRec_;
+namespace boost { template <class T> class optional; }
 
 namespace mapnik
 {
 
 class stroker;
-typedef std::shared_ptr<stroker> stroker_ptr;
+using stroker_ptr = std::shared_ptr<stroker>;
 class font_face_set;
-typedef std::shared_ptr<font_face_set> face_set_ptr;
+using face_set_ptr = std::shared_ptr<font_face_set>;
 class font_face;
-typedef std::shared_ptr<font_face> face_ptr;
+using face_ptr = std::shared_ptr<font_face>;
 
 
 class MAPNIK_DECL freetype_engine
@@ -66,32 +62,35 @@ public:
      *  @return bool - true if at least one face was successfully registered in the file.
      */
     static bool register_font(std::string const& file_name);
-    /*! \brief register a font file
+    /*! \brief register a font files
      *  @param dir - path to a directory containing fonts or subdirectories.
      *  @param recurse - default false, whether to search for fonts in sub directories.
      *  @return bool - true if at least one face was successfully registered.
      */
     static bool register_fonts(std::string const& dir, bool recurse = false);
     static std::vector<std::string> face_names();
-    static std::map<std::string,std::pair<int,std::string> > const& get_mapping();
+    static std::map<std::string, std::pair<int,std::string> > const& get_mapping();
     face_ptr create_face(std::string const& family_name);
     stroker_ptr create_stroker();
     virtual ~freetype_engine();
     freetype_engine();
 private:
-    FT_LibraryRec_ *library_;
+    static bool register_font_impl(std::string const& file_name, FT_LibraryRec_ * library);
+    static bool register_fonts_impl(std::string const& dir, FT_LibraryRec_ * library, bool recurse = false);
+    FT_LibraryRec_ * library_;
+    std::unique_ptr<FT_MemoryRec_> memory_;
 #ifdef MAPNIK_THREADSAFE
     static std::mutex mutex_;
 #endif
     static std::map<std::string, std::pair<int,std::string> > name2file_;
-    static std::map<std::string, std::string> memory_fonts_;
+    static std::map<std::string, std::pair<std::unique_ptr<char[]>, std::size_t> > memory_fonts_;
 };
 
 template <typename T>
 class MAPNIK_DECL face_manager : private mapnik::noncopyable
 {
-    typedef T font_engine_type;
-    typedef std::map<std::string, face_ptr> face_ptr_cache_type;
+    using font_engine_type = T;
+    using face_ptr_cache_type = std::map<std::string, face_ptr>;
 
 public:
     face_manager(T & engine)
@@ -113,7 +112,7 @@ private:
     face_ptr_cache_type face_ptr_cache_;
 };
 
-typedef face_manager<freetype_engine> face_manager_freetype;
+using face_manager_freetype = face_manager<freetype_engine>;
 
 }
 

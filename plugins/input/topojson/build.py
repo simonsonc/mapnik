@@ -31,7 +31,6 @@ plugin_sources = Split(
   """
   %(PLUGIN_NAME)s_datasource.cpp
   %(PLUGIN_NAME)s_featureset.cpp
-  %(PLUGIN_NAME)s_grammar.cpp
   """ % locals()
 )
 
@@ -43,7 +42,7 @@ libraries.append('boost_system%s' % env['BOOST_APPEND'])
 #    libraries.append('boost_thread%s' % env['BOOST_APPEND'])
 
 if env['PLUGIN_LINKING'] == 'shared':
-    libraries.append('mapnik')
+    libraries.append(env['MAPNIK_NAME'])
 
     TARGET = plugin_env.SharedLibrary('../%s' % PLUGIN_NAME,
                                       SHLIBPREFIX='',

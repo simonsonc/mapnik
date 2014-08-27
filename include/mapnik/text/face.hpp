@@ -36,7 +36,7 @@ extern "C"
 }
 
 //stl
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -47,6 +47,7 @@ namespace mapnik
 class font_face : mapnik::noncopyable
 {
 public:
+    using glyph_info_cache_type = std::unordered_map<glyph_index_t, glyph_info>;
     font_face(FT_Face face);
 
     std::string family_name() const
@@ -64,30 +65,32 @@ public:
         return face_;
     }
 
-    double get_char_height() const;
+    double get_char_height(double size) const;
 
     bool set_character_sizes(double size);
+    bool set_unscaled_character_sizes();
 
-    void glyph_dimensions(glyph_info &glyph) const;
+    bool glyph_dimensions(glyph_info &glyph) const;
 
     ~font_face();
 
 private:
     FT_Face face_;
-    mutable std::map<glyph_index_t, glyph_info> dimension_cache_;
+    mutable glyph_info_cache_type glyph_info_cache_;
     mutable double char_height_;
 };
-typedef std::shared_ptr<font_face> face_ptr;
+using face_ptr = std::shared_ptr<font_face>;
 
 
 class MAPNIK_DECL font_face_set : private mapnik::noncopyable
 {
 public:
-    typedef std::vector<face_ptr>::iterator iterator;
+    using iterator = std::vector<face_ptr>::iterator;
     font_face_set(void) : faces_(){}
 
     void add(face_ptr face);
     void set_character_sizes(double size);
+    void set_unscaled_character_sizes();
 
     unsigned size() const { return faces_.size(); }
     iterator begin() { return faces_.begin(); }
@@ -95,7 +98,7 @@ public:
 private:
     std::vector<face_ptr> faces_;
 };
-typedef std::shared_ptr<font_face_set> face_set_ptr;
+using face_set_ptr = std::shared_ptr<font_face_set>;
 
 
 // FT_Stroker wrapper

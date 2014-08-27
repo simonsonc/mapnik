@@ -46,8 +46,8 @@ template <typename T>
 class jpeg_reader : public image_reader
 {
 public:
-    typedef T source_type;
-    typedef boost::iostreams::stream<source_type> input_stream;
+    using source_type = T;
+    using input_stream = boost::iostreams::stream<source_type>;
     const static unsigned BUF_SIZE = 4096;
 private:
     struct jpeg_stream_wrapper
@@ -80,6 +80,7 @@ public:
     ~jpeg_reader();
     unsigned width() const;
     unsigned height() const;
+    inline bool has_alpha() const { return false; }
     inline bool premultiplied_alpha() const { return true; }
     void read(unsigned x,unsigned y,image_data_32& image);
 private:

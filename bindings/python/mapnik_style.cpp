@@ -20,6 +20,8 @@
  *
  *****************************************************************************/
 
+#include <mapnik/config.hpp>
+
 #include "boost_std_shared_shim.hpp"
 
 // boost
@@ -28,6 +30,7 @@
 
 // mapnik
 #include <mapnik/value_error.hpp>
+#include <mapnik/rule.hpp>
 #include "mapnik_enumeration.hpp"
 #include <mapnik/feature_type_style.hpp>
 #include <mapnik/image_filter_types.hpp> // generate_image_filters
@@ -108,4 +111,3 @@ void export_style()
         ;
 
 }
-
