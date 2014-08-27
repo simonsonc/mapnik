@@ -53,13 +53,24 @@ import re
 from waflib import Utils, Logs, Errors
 from waflib.Configure import conf
 
-BOOST_LIBS = ['/usr/lib', '/usr/local/lib', '/opt/local/lib', '/sw/lib', '/lib']
+BOOST_LIBS = ['/usr/lib/x86_64-linux-gnu', '/usr/lib/i386-linux-gnu',
+	      '/usr/lib', '/usr/local/lib', '/opt/local/lib', '/sw/lib', '/lib']
 BOOST_INCLUDES = ['/usr/include', '/usr/local/include', '/opt/local/include', '/sw/include']
 BOOST_VERSION_FILE = 'boost/version.hpp'
 BOOST_VERSION_CODE = '''
 #include <iostream>
 #include <boost/version.hpp>
 int main() { std::cout << BOOST_LIB_VERSION << std::endl; }
+'''
+
+BOOST_ERROR_CODE = '''
+#include <boost/system/error_code.hpp>
+int main() { boost::system::error_code c; }
+'''
+
+BOOST_THREAD_CODE = '''
+#include <boost/thread.hpp>
+int main() { boost::thread t; }
 '''
 
 # toolsets from {boost_dir}/tools/build/v2/tools/common.jam
@@ -303,23 +314,9 @@ def check_boost(self, *k, **kw):
 
 	def try_link():
 		if 'system' in params['lib']:
-			self.check_cxx(
-			 fragment="\n".join([
-			  '#include <boost/system/error_code.hpp>',
-			  'int main() { boost::system::error_code c; }',
-			 ]),
-			 use=var,
-			 execute=False,
-			)
+			self.check_cxx(fragment=BOOST_ERROR_CODE, use=var, execute=False)
 		if 'thread' in params['lib']:
-			self.check_cxx(
-			 fragment="\n".join([
-			  '#include <boost/thread.hpp>',
-			  'int main() { boost::thread t; }',
-			 ]),
-			 use=var,
-			 execute=False,
-			)
+			self.check_cxx(fragment=BOOST_THREAD_CODE, use=var, execute=False)
 
 	if params.get('linkage_autodetect', False):
 		self.start_msg("Attempting to detect boost linkage flags")
